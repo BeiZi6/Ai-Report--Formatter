@@ -24,6 +24,39 @@ class HeadingStyle:
     para_after_pt: int
 
 
+def _default_heading_styles(base: BodyStyle) -> dict[int, HeadingStyle]:
+    return {
+        1: HeadingStyle(
+            font=base.cn_font,
+            size_pt=16,
+            line_spacing=base.line_spacing,
+            para_before_pt=6,
+            para_after_pt=6,
+        ),
+        2: HeadingStyle(
+            font=base.cn_font,
+            size_pt=14,
+            line_spacing=base.line_spacing,
+            para_before_pt=6,
+            para_after_pt=6,
+        ),
+        3: HeadingStyle(
+            font=base.cn_font,
+            size_pt=13,
+            line_spacing=base.line_spacing,
+            para_before_pt=6,
+            para_after_pt=6,
+        ),
+        4: HeadingStyle(
+            font=base.cn_font,
+            size_pt=12,
+            line_spacing=base.line_spacing,
+            para_before_pt=6,
+            para_after_pt=6,
+        ),
+    }
+
+
 @dataclass
 class FormatConfig:
     body_style: BodyStyle = field(default_factory=BodyStyle)
@@ -32,35 +65,9 @@ class FormatConfig:
     page_num_position: str = "center"
 
     def __post_init__(self) -> None:
+        defaults = _default_heading_styles(self.body_style)
         if not self.heading_styles:
-            base = self.body_style
-            self.heading_styles = {
-                1: HeadingStyle(
-                    font=base.cn_font,
-                    size_pt=16,
-                    line_spacing=base.line_spacing,
-                    para_before_pt=6,
-                    para_after_pt=6,
-                ),
-                2: HeadingStyle(
-                    font=base.cn_font,
-                    size_pt=14,
-                    line_spacing=base.line_spacing,
-                    para_before_pt=6,
-                    para_after_pt=6,
-                ),
-                3: HeadingStyle(
-                    font=base.cn_font,
-                    size_pt=13,
-                    line_spacing=base.line_spacing,
-                    para_before_pt=6,
-                    para_after_pt=6,
-                ),
-                4: HeadingStyle(
-                    font=base.cn_font,
-                    size_pt=12,
-                    line_spacing=base.line_spacing,
-                    para_before_pt=6,
-                    para_after_pt=6,
-                ),
-            }
+            self.heading_styles = defaults
+            return
+        for level, style in defaults.items():
+            self.heading_styles.setdefault(level, style)
