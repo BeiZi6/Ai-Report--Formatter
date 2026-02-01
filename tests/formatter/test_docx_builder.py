@@ -1,3 +1,4 @@
+from formatter.config import FormatConfig
 from formatter.docx_builder import build_docx
 
 
@@ -7,5 +8,5 @@ def test_build_docx_creates_docx(tmp_path):
         {"type": "paragraph", "text": "Hello"},
     ]
     output = tmp_path / "out.docx"
-    build_docx(ast, output)
+    build_docx(ast, output, FormatConfig())
     assert output.exists()
