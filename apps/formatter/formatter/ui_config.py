@@ -8,12 +8,20 @@ def build_format_config(
     cn_font: str,
     en_font: str,
     heading_font: str,
-    heading_size_pt: int,
+    heading1_size_pt: int,
+    heading2_size_pt: int,
+    heading3_size_pt: int,
+    heading4_size_pt: int,
+    heading_line_spacing: float,
+    heading_para_before_lines: float,
+    heading_para_after_lines: float,
     body_size_pt: int,
     line_spacing: float,
-    para_before_pt: int,
-    para_after_pt: int,
-    first_line_indent: bool,
+    para_before_lines: float,
+    para_after_lines: float,
+    indent_before_chars: int,
+    indent_after_chars: int,
+    first_line_indent_chars: int,
     justify: bool,
     clear_background: bool,
     page_num_position: str,
@@ -23,20 +31,22 @@ def build_format_config(
         en_font=en_font,
         size_pt=body_size_pt,
         line_spacing=line_spacing,
-        para_before_pt=para_before_pt,
-        para_after_pt=para_after_pt,
-        first_line_indent=first_line_indent,
+        para_before_lines=para_before_lines,
+        para_after_lines=para_after_lines,
+        indent_before_chars=indent_before_chars,
+        indent_after_chars=indent_after_chars,
+        first_line_indent_chars=first_line_indent_chars,
         justify=justify,
     )
 
-    heading_sizes = [heading_size_pt, heading_size_pt - 2, heading_size_pt - 3, heading_size_pt - 4]
+    heading_sizes = [heading1_size_pt, heading2_size_pt, heading3_size_pt, heading4_size_pt]
     heading_styles = {
         level: HeadingStyle(
             font=heading_font,
             size_pt=size,
-            line_spacing=line_spacing,
-            para_before_pt=max(0, para_before_pt + 6),
-            para_after_pt=max(0, para_after_pt + 6),
+            line_spacing=heading_line_spacing,
+            para_before_lines=heading_para_before_lines,
+            para_after_lines=heading_para_after_lines,
         )
         for level, size in zip(range(1, 5), heading_sizes)
     }

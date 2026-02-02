@@ -15,8 +15,8 @@ def test_heading_styles_can_be_overridden_and_filled():
                 font="Arial",
                 size_pt=20,
                 line_spacing=1.0,
-                para_before_pt=0,
-                para_after_pt=0,
+                para_before_lines=0.0,
+                para_after_lines=0.0,
             )
         }
     )

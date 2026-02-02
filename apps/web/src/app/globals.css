@@ -252,6 +252,10 @@ textarea {
   padding: 0.65rem 0.75rem;
 }
 
+.field.compact input {
+  padding: 0.65rem 0.75rem;
+}
+
 .hint {
   font-size: var(--text-xs);
   color: var(--ink-muted);
@@ -265,7 +269,7 @@ textarea {
 
 .config-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--space-sm);
 }
 
@@ -413,6 +417,15 @@ textarea {
 .note-box h4 {
   font-size: var(--text-sm);
   color: var(--ink);
+}
+
+.page-footer {
+  margin-top: var(--space-xl);
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 .reveal {

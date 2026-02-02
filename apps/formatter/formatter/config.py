@@ -8,10 +8,12 @@ class BodyStyle:
     cn_font: str = "SimSun"
     en_font: str = "Times New Roman"
     size_pt: int = 12
-    line_spacing: float = 1.5
-    para_before_pt: int = 0
-    para_after_pt: int = 0
-    first_line_indent: bool = True
+    line_spacing: float = 1.25
+    para_before_lines: float = 0.0
+    para_after_lines: float = 0.0
+    indent_before_chars: int = 0
+    indent_after_chars: int = 0
+    first_line_indent_chars: int = 2
     justify: bool = True
 
 
@@ -20,39 +22,39 @@ class HeadingStyle:
     font: str
     size_pt: int
     line_spacing: float
-    para_before_pt: int
-    para_after_pt: int
+    para_before_lines: float
+    para_after_lines: float
 
 
 def _default_heading_styles(base: BodyStyle) -> dict[int, HeadingStyle]:
     return {
         1: HeadingStyle(
             font=base.cn_font,
-            size_pt=16,
-            line_spacing=base.line_spacing,
-            para_before_pt=6,
-            para_after_pt=6,
+            size_pt=14,
+            line_spacing=1.25,
+            para_before_lines=0.5,
+            para_after_lines=0.5,
         ),
         2: HeadingStyle(
             font=base.cn_font,
             size_pt=14,
-            line_spacing=base.line_spacing,
-            para_before_pt=6,
-            para_after_pt=6,
+            line_spacing=1.25,
+            para_before_lines=0.5,
+            para_after_lines=0.5,
         ),
         3: HeadingStyle(
             font=base.cn_font,
-            size_pt=13,
-            line_spacing=base.line_spacing,
-            para_before_pt=6,
-            para_after_pt=6,
+            size_pt=14,
+            line_spacing=1.25,
+            para_before_lines=0.5,
+            para_after_lines=0.5,
         ),
         4: HeadingStyle(
             font=base.cn_font,
-            size_pt=12,
-            line_spacing=base.line_spacing,
-            para_before_pt=6,
-            para_after_pt=6,
+            size_pt=14,
+            line_spacing=1.25,
+            para_before_lines=0.5,
+            para_after_lines=0.5,
         ),
     }
 

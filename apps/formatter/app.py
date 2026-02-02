@@ -30,12 +30,36 @@ def _sidebar_config() -> FormatConfig:
     cn_font = st.sidebar.text_input("中文字体", value="SimSun")
     en_font = st.sidebar.text_input("英文字体", value="Times New Roman")
     heading_font = st.sidebar.text_input("标题字体", value="SimHei")
-    heading_size = st.sidebar.number_input("标题字号 (pt)", min_value=8, max_value=48, value=16)
+    heading1_size = st.sidebar.number_input("标题字号 H1 (pt)", min_value=8, max_value=48, value=14)
+    heading2_size = st.sidebar.number_input("标题字号 H2 (pt)", min_value=8, max_value=48, value=14)
+    heading3_size = st.sidebar.number_input("标题字号 H3 (pt)", min_value=8, max_value=48, value=14)
+    heading4_size = st.sidebar.number_input("标题字号 H4 (pt)", min_value=8, max_value=48, value=14)
+    heading_line_spacing = st.sidebar.selectbox(
+        "标题行距", [1.0, 1.25, 1.5, 1.75, 2.0], index=1
+    )
+    heading_para_before = st.sidebar.number_input(
+        "标题段前 (行)", min_value=0.0, max_value=10.0, value=0.5, step=0.1
+    )
+    heading_para_after = st.sidebar.number_input(
+        "标题段后 (行)", min_value=0.0, max_value=10.0, value=0.5, step=0.1
+    )
     body_size = st.sidebar.number_input("正文字号 (pt)", min_value=8, max_value=32, value=12)
-    line_spacing = st.sidebar.selectbox("行间距", [1.0, 1.25, 1.5, 1.75, 2.0], index=2)
-    para_before = st.sidebar.number_input("段前 (pt)", min_value=0, max_value=48, value=0)
-    para_after = st.sidebar.number_input("段后 (pt)", min_value=0, max_value=48, value=0)
-    first_line = st.sidebar.checkbox("首行缩进 2 字符", value=True)
+    line_spacing = st.sidebar.selectbox("正文行距", [1.0, 1.25, 1.5, 1.75, 2.0], index=1)
+    para_before = st.sidebar.number_input(
+        "正文段前 (行)", min_value=0.0, max_value=10.0, value=0.0, step=0.1
+    )
+    para_after = st.sidebar.number_input(
+        "正文段后 (行)", min_value=0.0, max_value=10.0, value=0.0, step=0.1
+    )
+    indent_before = st.sidebar.number_input(
+        "文本之前 (字符)", min_value=0, max_value=10, value=0, step=1
+    )
+    indent_after = st.sidebar.number_input(
+        "文本之后 (字符)", min_value=0, max_value=10, value=0, step=1
+    )
+    first_line = st.sidebar.number_input(
+        "首行缩进 (字符)", min_value=0, max_value=10, value=2, step=1
+    )
     justify = st.sidebar.checkbox("两端对齐", value=True)
     clear_bg = st.sidebar.checkbox("清除背景色", value=True)
     page_num_pos = st.sidebar.selectbox("页码位置", ["center", "right"], index=0)
@@ -44,12 +68,20 @@ def _sidebar_config() -> FormatConfig:
         cn_font=cn_font,
         en_font=en_font,
         heading_font=heading_font,
-        heading_size_pt=heading_size,
+        heading1_size_pt=int(heading1_size),
+        heading2_size_pt=int(heading2_size),
+        heading3_size_pt=int(heading3_size),
+        heading4_size_pt=int(heading4_size),
+        heading_line_spacing=float(heading_line_spacing),
+        heading_para_before_lines=float(heading_para_before),
+        heading_para_after_lines=float(heading_para_after),
         body_size_pt=body_size,
         line_spacing=float(line_spacing),
-        para_before_pt=para_before,
-        para_after_pt=para_after,
-        first_line_indent=first_line,
+        para_before_lines=float(para_before),
+        para_after_lines=float(para_after),
+        indent_before_chars=int(indent_before),
+        indent_after_chars=int(indent_after),
+        first_line_indent_chars=int(first_line),
         justify=justify,
         clear_background=clear_bg,
         page_num_position=page_num_pos,

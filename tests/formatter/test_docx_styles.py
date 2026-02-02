@@ -1,8 +1,8 @@
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.shared import Cm, Pt
+from docx.shared import Cm, Pt, RGBColor
 
-from formatter.config import FormatConfig
+from formatter.config import BodyStyle, FormatConfig, HeadingStyle
 from formatter.docx_builder import build_docx
 
 
@@ -56,3 +56,68 @@ def test_build_docx_falls_back_on_style_failure(tmp_path, monkeypatch):
     assert paragraph.paragraph_format.first_line_indent == Pt(
         config.body_style.size_pt * 2
     )
+
+
+def test_docx_applies_line_spacing_and_indents(tmp_path):
+    config = FormatConfig(
+        body_style=BodyStyle(
+            cn_font="SimSun",
+            en_font="Times New Roman",
+            size_pt=12,
+            line_spacing=1.25,
+            para_before_lines=0.0,
+            para_after_lines=0.0,
+            indent_before_chars=1,
+            indent_after_chars=2,
+            first_line_indent_chars=2,
+            justify=True,
+        ),
+        heading_styles={
+            1: HeadingStyle(
+                font="SimHei",
+                size_pt=14,
+                line_spacing=1.25,
+                para_before_lines=0.5,
+                para_after_lines=0.5,
+            )
+        },
+    )
+    output = tmp_path / "out.docx"
+    build_docx(
+        [
+            {"type": "heading", "level": 1, "text": "Title"},
+            {"type": "paragraph", "text": "Hello"},
+        ],
+        output,
+        config,
+    )
+
+    doc = Document(output)
+    normal = doc.styles["Normal"]
+    assert normal.paragraph_format.left_indent == Pt(12)
+    assert normal.paragraph_format.right_indent == Pt(24)
+    assert normal.paragraph_format.first_line_indent == Pt(24)
+
+    h1 = doc.styles["Heading 1"]
+    assert h1.paragraph_format.space_before == Pt(7)
+    assert h1.paragraph_format.space_after == Pt(7)
+
+
+def test_docx_heading_color_is_black(tmp_path):
+    config = FormatConfig(
+        heading_styles={
+            1: HeadingStyle(
+                font="SimHei",
+                size_pt=14,
+                line_spacing=1.25,
+                para_before_lines=0.5,
+                para_after_lines=0.5,
+            )
+        }
+    )
+    output = tmp_path / "out.docx"
+    build_docx([{"type": "heading", "level": 1, "text": "标题"}], output, config)
+
+    doc = Document(output)
+    h1 = doc.styles["Heading 1"]
+    assert h1.font.color.rgb == RGBColor(0, 0, 0)
