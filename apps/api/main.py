@@ -11,7 +11,11 @@ from fastapi.responses import Response
 # Ensure formatter package is importable when running via apps/api
 FORMATTER_PATH = Path(__file__).resolve().parents[1] / "formatter"
 if str(FORMATTER_PATH) not in sys.path:
-    sys.path.append(str(FORMATTER_PATH))
+    sys.path.insert(0, str(FORMATTER_PATH))
+
+formatter_module = sys.modules.get("formatter")
+if formatter_module is not None and not hasattr(formatter_module, "__path__"):
+    del sys.modules["formatter"]
 
 from formatter.app_logic import build_preview_payload
 from formatter.docx_builder import build_docx
