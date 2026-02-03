@@ -28,6 +28,8 @@ def _chars_to_pt(chars: int, font_size_pt: int) -> Pt:
 
 
 LIST_INDENT_PT = 18
+THREE_LINE_BORDER_THICK_SZ = 12
+THREE_LINE_BORDER_THIN_SZ = 6
 
 
 def _apply_list_indents(paragraph, level: int) -> None:
@@ -177,7 +179,7 @@ def _apply_three_line_table(table) -> None:
     for edge in ("top", "bottom"):
         elem = OxmlElement(f"w:{edge}")
         elem.set(qn("w:val"), "single")
-        elem.set(qn("w:sz"), "8")
+        elem.set(qn("w:sz"), str(THREE_LINE_BORDER_THICK_SZ))
         elem.set(qn("w:color"), "000000")
         borders.append(elem)
     for edge in ("left", "right", "insideH"):
@@ -196,7 +198,7 @@ def _apply_header_bottom_border(row) -> None:
             tc_pr.append(tc_borders)
         bottom = OxmlElement("w:bottom")
         bottom.set(qn("w:val"), "single")
-        bottom.set(qn("w:sz"), "8")
+        bottom.set(qn("w:sz"), str(THREE_LINE_BORDER_THIN_SZ))
         bottom.set(qn("w:color"), "000000")
         tc_borders.append(bottom)
 

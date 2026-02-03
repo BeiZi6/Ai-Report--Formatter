@@ -289,4 +289,7 @@ def test_table_uses_three_line_style(tmp_path):
     doc = Document(output)
     tbl_xml = doc.tables[0]._tbl.xml
     assert "w:tblBorders" in tbl_xml
+    assert 'w:top w:val="single" w:sz="12"' in tbl_xml
+    assert 'w:bottom w:val="single" w:sz="12"' in tbl_xml
+    assert 'w:bottom w:val="single" w:sz="6"' in tbl_xml
     assert "insideV" not in tbl_xml
