@@ -272,3 +272,21 @@ def test_math_block_adds_equation_number(tmp_path):
     paragraph = doc.paragraphs[0]
     xml = paragraph._p.xml
     assert "SEQ Equation" in xml
+
+
+def test_table_uses_three_line_style(tmp_path):
+    ast = [
+        {
+            "type": "table",
+            "align": ["left"],
+            "header": [{"text": "列1"}],
+            "rows": [[{"text": "A"}]],
+        }
+    ]
+    output = tmp_path / "out.docx"
+    build_docx(ast, output, FormatConfig())
+
+    doc = Document(output)
+    tbl_xml = doc.tables[0]._tbl.xml
+    assert "w:tblBorders" in tbl_xml
+    assert "insideV" not in tbl_xml

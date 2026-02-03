@@ -164,6 +164,43 @@ def _cell_alignment(align: str):
     return WD_PARAGRAPH_ALIGNMENT.LEFT
 
 
+def _apply_three_line_table(table) -> None:
+    tbl = table._tbl
+    tbl_pr = tbl.tblPr
+    if tbl_pr is None:
+        tbl_pr = OxmlElement("w:tblPr")
+        tbl.insert(0, tbl_pr)
+    existing = tbl_pr.find(qn("w:tblBorders"))
+    if existing is not None:
+        tbl_pr.remove(existing)
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "bottom"):
+        elem = OxmlElement(f"w:{edge}")
+        elem.set(qn("w:val"), "single")
+        elem.set(qn("w:sz"), "8")
+        elem.set(qn("w:color"), "000000")
+        borders.append(elem)
+    for edge in ("left", "right", "insideH"):
+        elem = OxmlElement(f"w:{edge}")
+        elem.set(qn("w:val"), "nil")
+        borders.append(elem)
+    tbl_pr.append(borders)
+
+
+def _apply_header_bottom_border(row) -> None:
+    for cell in row.cells:
+        tc_pr = cell._tc.get_or_add_tcPr()
+        tc_borders = tc_pr.find(qn("w:tcBorders"))
+        if tc_borders is None:
+            tc_borders = OxmlElement("w:tcBorders")
+            tc_pr.append(tc_borders)
+        bottom = OxmlElement("w:bottom")
+        bottom.set(qn("w:val"), "single")
+        bottom.set(qn("w:sz"), "8")
+        bottom.set(qn("w:color"), "000000")
+        tc_borders.append(bottom)
+
+
 def _add_table(doc, node: dict) -> None:
     header = node.get("header", [])
     rows = node.get("rows", [])
@@ -172,6 +209,7 @@ def _add_table(doc, node: dict) -> None:
     align = node.get("align", ["left"] * len(header))
     table = doc.add_table(rows=1 + len(rows), cols=len(header))
     table.style = "Table Grid"
+    _apply_three_line_table(table)
 
     all_rows = [header] + rows
     for r_idx, row in enumerate(all_rows):
@@ -181,6 +219,8 @@ def _add_table(doc, node: dict) -> None:
             paragraph = cell_obj.paragraphs[0]
             paragraph.alignment = _cell_alignment(align[c_idx] if c_idx < len(align) else "left")
             _add_runs(paragraph, cell.get("runs", []), cell.get("text", ""))
+        if r_idx == 0:
+            _apply_header_bottom_border(table.rows[r_idx])
 
 
 def build_docx(ast: list[dict], output_path, config: FormatConfig | None = None) -> None:
