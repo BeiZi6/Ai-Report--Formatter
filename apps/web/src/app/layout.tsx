@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Alegreya, IBM_Plex_Sans } from "next/font/google";
+import { Press_Start_2P, Space_Mono } from "next/font/google";
 import "./globals.css";
 
-const display = Alegreya({
+const display = Press_Start_2P({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "400",
 });
 
-const ui = IBM_Plex_Sans({
+const ui = Space_Mono({
   variable: "--font-ui",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {

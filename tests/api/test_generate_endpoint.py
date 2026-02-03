@@ -12,7 +12,8 @@ def test_generate_endpoint_returns_docx():
             "config": {
                 "cn_font": "SimSun",
                 "en_font": "Times New Roman",
-                "heading_font": "SimHei",
+                "heading_cn_font": "SimHei",
+                "heading_en_font": "Times New Roman",
                 "heading1_size_pt": 16,
                 "heading2_size_pt": 16,
                 "heading3_size_pt": 16,
@@ -50,7 +51,8 @@ def test_generate_endpoint_accepts_paragraph_units():
             "config": {
                 "cn_font": "SimSun",
                 "en_font": "Times New Roman",
-                "heading_font": "SimHei",
+                "heading_cn_font": "SimHei",
+                "heading_en_font": "Times New Roman",
                 "heading1_size_pt": 14,
                 "heading2_size_pt": 14,
                 "heading3_size_pt": 14,

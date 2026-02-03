@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+formatter/__init__.py
+formatter/app_logic.py
+formatter/citations.py
+formatter/config.py
+formatter/docx_builder.py
+formatter/latex.py
+formatter/markdown_parser.py
+formatter/pipeline.py
+formatter/preview.py
+formatter/ui_config.py
+formatter.egg-info/PKG-INFO
+formatter.egg-info/SOURCES.txt
+formatter.egg-info/dependency_links.txt
+formatter.egg-info/requires.txt
+formatter.egg-info/top_level.txt

@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
-import { fetchPreview, generateDocx } from '../lib/api';
+import { fetchExportStats, fetchPreview, generateDocx } from "../lib/api";
 
 type PreviewPayload = {
   summary?: {
@@ -10,6 +11,11 @@ type PreviewPayload = {
     paragraphs?: number;
   };
   refs?: string[];
+};
+
+type ExportStats = {
+  today: number;
+  total: number;
 };
 
 type FormatConfig = {
@@ -37,10 +43,10 @@ type FormatConfig = {
 };
 
 const DEFAULT_CONFIG: FormatConfig = {
-  cn_font: 'SimSun',
-  en_font: 'Times New Roman',
-  heading_cn_font: 'SimHei',
-  heading_en_font: 'Times New Roman',
+  cn_font: "SimSun",
+  en_font: "Times New Roman",
+  heading_cn_font: "SimHei",
+  heading_en_font: "Times New Roman",
   heading1_size_pt: 14,
   heading2_size_pt: 14,
   heading3_size_pt: 14,
@@ -57,26 +63,109 @@ const DEFAULT_CONFIG: FormatConfig = {
   first_line_indent_chars: 2,
   justify: true,
   clear_background: true,
-  page_num_position: 'center',
+  page_num_position: "center",
 };
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  visible: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const, delay },
+  }),
+};
+
+function StatusPill({ label }: { label: string }) {
+  return (
+    <div className="status-pill" aria-live="polite">
+      <span className="dot-pulse" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+type WaveRibbonProps = {
+  status: string;
+  onGenerate: () => void;
+  disabled: boolean;
+};
+
+function WaveRibbon({ status, onGenerate, disabled }: WaveRibbonProps) {
+  return (
+    <div className="wave-wrap" aria-hidden={false}>
+      <motion.div
+        className="wave-track"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <motion.div
+          className="wave-line"
+          animate={{ translateY: [0, -8, 0, 10, 0] }}
+          transition={{ repeat: Infinity, duration: 14, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="wave-glow"
+          animate={{ translateX: ["-10%", "110%"] }}
+          transition={{ repeat: Infinity, duration: 6, ease: "linear" }}
+        />
+      </motion.div>
+
+      <div className="wave-content">
+        <div className="wave-meta">
+          <span className="label">DEV · Monochrome</span>
+          <span className="wave-status">{status}</span>
+        </div>
+        <div className="wave-verse" aria-hidden="true">
+          <span className="verse-text">待到秋来九月八  我花开后百花杀</span>
+        </div>
+        <div className="wave-actions">
+          <button
+            type="button"
+            className="primary-btn strong"
+            onClick={onGenerate}
+            disabled={disabled}
+            aria-disabled={disabled}
+          >
+            {disabled ? "待输入" : "生成 Word"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
-  const [markdown, setMarkdown] = useState('');
+  const [markdown, setMarkdown] = useState("");
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportStats, setExportStats] = useState<ExportStats | null>(null);
   const [config, setConfig] = useState<FormatConfig>(DEFAULT_CONFIG);
   const fontSizeOptions = [
-    { label: '小四 (12pt)', value: 12 },
-    { label: '四号 (14pt)', value: 14 },
-    { label: '小三 (16pt)', value: 16 },
-    { label: '三号 (18pt)', value: 18 },
-    { label: '二号 (22pt)', value: 22 },
+    { label: "小四 (12pt)", value: 12 },
+    { label: "四号 (14pt)", value: 14 },
+    { label: "小三 (16pt)", value: 16 },
+    { label: "三号 (18pt)", value: 18 },
+    { label: "二号 (22pt)", value: 22 },
   ];
   const lineSpacingOptions = [1, 1.25, 1.5, 1.75, 2];
 
   const isEmpty = markdown.trim().length === 0;
+
+  const refreshExportStats = async () => {
+    try {
+      const data = await fetchExportStats();
+      setExportStats(data);
+    } catch {
+      setExportStats(null);
+    }
+  };
+
+  useEffect(() => {
+    refreshExportStats();
+  }, []);
 
   useEffect(() => {
     if (isEmpty) {
@@ -93,10 +182,10 @@ export default function Home() {
         const data = await fetchPreview(markdown, controller.signal);
         setPreview(data);
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
+        if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
-        setError('预览失败，请检查接口连接');
+        setError("预览失败，请检查接口连接");
       } finally {
         setIsLoading(false);
       }
@@ -117,11 +206,11 @@ export default function Home() {
   }, [paragraphCount]);
 
   const statusLabel = useMemo(() => {
-    if (isGenerating) return '正在导出';
-    if (isLoading) return '分析中…';
-    if (error) return '预览失败';
-    if (isEmpty) return '等待输入';
-    return '已更新';
+    if (isGenerating) return "正在导出";
+    if (isLoading) return "分析中…";
+    if (error) return "预览失败";
+    if (isEmpty) return "等待输入";
+    return "已更新";
   }, [error, isEmpty, isGenerating, isLoading]);
 
   const handleGenerate = async () => {
@@ -131,17 +220,18 @@ export default function Home() {
     try {
       const blob = await generateDocx(markdown, config);
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = 'ai-report.docx';
+      link.download = "ai-report.docx";
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError('导出失败，请稍后重试');
+      setError("导出失败，请稍后重试");
     } finally {
       setIsGenerating(false);
+      refreshExportStats();
     }
   };
 
@@ -150,8 +240,17 @@ export default function Home() {
       <a className="skip-link" href="#main-content">
         跳到主要内容
       </a>
+      <div className="scanline-band" aria-hidden="true" />
 
-      <header className="hero reveal delay-1">
+      <WaveRibbon status={statusLabel} onGenerate={handleGenerate} disabled={isEmpty || isGenerating} />
+
+      <motion.header
+        className="hero"
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        custom={0}
+      >
         <div className="hero-badge">FastAPI · Next.js · Word</div>
         <h1 className="hero-title">AI 报告排版助手</h1>
         <p className="hero-subtitle">
@@ -168,18 +267,23 @@ export default function Home() {
           </span>
           <span>一键导出</span>
         </div>
-      </header>
+      </motion.header>
 
-      <main id="main-content" className="workspace reveal delay-2">
-        <section className="panel">
+      <motion.main
+        id="main-content"
+        className="workspace"
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        custom={0.1}
+      >
+        <motion.section className="panel" variants={fadeUp} custom={0.2}>
           <div className="panel-header">
             <div>
               <p className="panel-kicker">输入与配置</p>
               <h2 className="panel-title">Markdown 工作区</h2>
             </div>
-            <div className="status-pill" aria-live="polite">
-              {statusLabel}
-            </div>
+            <StatusPill label={statusLabel} />
           </div>
 
           <div className="field">
@@ -500,6 +604,7 @@ export default function Home() {
                   <input
                     id="indent-before"
                     name="indent-before"
+                    data-testid="left-indent"
                     type="number"
                     min={0}
                     step={1}
@@ -518,6 +623,7 @@ export default function Home() {
                   <input
                     id="indent-after"
                     name="indent-after"
+                    data-testid="right-indent"
                     type="number"
                     min={0}
                     step={1}
@@ -536,6 +642,7 @@ export default function Home() {
                   <input
                     id="indent-first-line"
                     name="indent-first-line"
+                    data-testid="first-line-indent"
                     type="number"
                     min={0}
                     step={1}
@@ -557,7 +664,7 @@ export default function Home() {
             <button
               className="ghost-btn"
               type="button"
-              onClick={() => setMarkdown('')}
+              onClick={() => setMarkdown("")}
             >
               清空内容
             </button>
@@ -565,23 +672,26 @@ export default function Home() {
               className="primary-btn"
               type="button"
               onClick={handleGenerate}
-              disabled={isEmpty || isGenerating}
-              aria-disabled={isEmpty || isGenerating}
-            >
-              {isGenerating ? '生成中…' : '生成 Word'}
-            </button>
-          </div>
+                disabled={isEmpty || isGenerating}
+                aria-disabled={isEmpty || isGenerating}
+                data-testid="btn-generate"
+              >
+                {isGenerating ? "生成中…" : "生成 Word"}
+              </button>
+            </div>
 
           {error ? <p className="error-text">{error}</p> : null}
-        </section>
+        </motion.section>
 
-        <section className="panel preview-panel">
+        <motion.section className="panel preview-panel" variants={fadeUp} custom={0.3}>
           <div className="panel-header">
             <div>
               <p className="panel-kicker">预览摘要</p>
               <h2 className="panel-title">结构概览</h2>
             </div>
-            <div className="meta-chip">今日已导出 3 次</div>
+            <div className="meta-chip">
+              今日已导出 {exportStats?.today ?? "—"} 次
+            </div>
           </div>
 
           <div className="stats-grid">
@@ -611,9 +721,10 @@ export default function Home() {
                 <>
                   <p>已识别 {paragraphCount} 个段落与 {headingCount} 个标题。</p>
                   <ul>
-                    <li>最新引用：{preview?.refs?.[0] ?? '无'}</li>
+                    <li>最新引用：{preview?.refs?.[0] ?? "无"}</li>
                     <li>分页建议：约 {estimatedPages} 页</li>
-                    <li>字体：{config.cn_font} / {config.en_font}</li>
+                    <li>正文字体：{config.cn_font} / {config.en_font}</li>
+                    <li>标题字体：{config.heading_cn_font} / {config.heading_en_font}</li>
                   </ul>
                 </>
               )}
@@ -628,8 +739,8 @@ export default function Home() {
               (<kbd>F9</kbd>)，即可刷新公式/表格编号；块级公式已默认居中。
             </p>
           </div>
-        </section>
-      </main>
+        </motion.section>
+      </motion.main>
 
       <footer className="page-footer">
         <p>

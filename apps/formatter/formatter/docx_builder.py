@@ -194,6 +194,10 @@ def _apply_three_line_table(table) -> None:
         borders.append(elem)
     tbl_pr.append(borders)
 
+    inside_v = borders.find(qn("w:insideV"))
+    if inside_v is not None:
+        borders.remove(inside_v)
+
 
 def _apply_header_bottom_border(row) -> None:
     for cell in row.cells:
@@ -216,7 +220,11 @@ def _add_table(doc, node: dict) -> None:
         return
     align = node.get("align", ["left"] * len(header))
     table = doc.add_table(rows=1 + len(rows), cols=len(header))
-    table.style = "Table Grid"
+    # Avoid built-in styles that reintroduce vertical borders
+    try:
+        table.style = None
+    except Exception:
+        table.style = "Table Grid"
     _apply_three_line_table(table)
 
     all_rows = [header] + rows
@@ -269,7 +277,7 @@ def build_docx(ast: list[dict], output_path, config: FormatConfig | None = None)
 
         for level, hstyle in config.heading_styles.items():
             h = doc.styles[f"Heading {level}"]
-            _set_style_fonts(h, hstyle.font, hstyle.font)
+            _set_style_fonts(h, hstyle.en_font, hstyle.cn_font)
             h.font.color.rgb = RGBColor(0, 0, 0)
             _apply_style_paragraph(
                 h,

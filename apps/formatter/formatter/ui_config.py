@@ -7,7 +7,9 @@ def build_format_config(
     *,
     cn_font: str,
     en_font: str,
-    heading_font: str,
+    heading_font: str | None = None,
+    heading_cn_font: str | None = None,
+    heading_en_font: str | None = None,
     heading1_size_pt: int,
     heading2_size_pt: int,
     heading3_size_pt: int,
@@ -26,6 +28,10 @@ def build_format_config(
     clear_background: bool,
     page_num_position: str,
 ) -> FormatConfig:
+    # Backward compatibility: if separate heading fonts are not provided, fall back to single heading_font
+    resolved_heading_cn_font = heading_cn_font or heading_font or cn_font
+    resolved_heading_en_font = heading_en_font or heading_font or en_font
+
     body_style = BodyStyle(
         cn_font=cn_font,
         en_font=en_font,
@@ -42,7 +48,8 @@ def build_format_config(
     heading_sizes = [heading1_size_pt, heading2_size_pt, heading3_size_pt, heading4_size_pt]
     heading_styles = {
         level: HeadingStyle(
-            font=heading_font,
+            en_font=resolved_heading_en_font,
+            cn_font=resolved_heading_cn_font,
             size_pt=size,
             line_spacing=heading_line_spacing,
             para_before_lines=heading_para_before_lines,

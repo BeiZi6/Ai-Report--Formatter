@@ -1,0 +1,8 @@
+python-docx
+markdown-it-py
+mdit-py-plugins
+latex2mathml
+mathml2omml
+
+[app]
+streamlit

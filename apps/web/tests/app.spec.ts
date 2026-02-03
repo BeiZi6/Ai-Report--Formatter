@@ -13,8 +13,8 @@ test('settings panel includes paragraph spacing and indent controls', async ({ p
   await expect(page.getByLabel('标题段后')).toBeVisible();
   await expect(page.getByLabel('正文段前')).toBeVisible();
   await expect(page.getByLabel('正文段后')).toBeVisible();
-  await expect(page.getByLabel('文本之前')).toBeVisible();
-  await expect(page.getByLabel('文本之后')).toBeVisible();
+  await expect(page.getByLabel('左缩进')).toBeVisible();
+  await expect(page.getByLabel('右缩进')).toBeVisible();
   await expect(page.getByLabel('首行缩进')).toBeVisible();
   await expect(page.getByLabel('正文行距')).toBeVisible();
 });

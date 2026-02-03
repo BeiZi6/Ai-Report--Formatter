@@ -29,7 +29,8 @@ def _sidebar_config() -> FormatConfig:
     st.sidebar.header("样式设置")
     cn_font = st.sidebar.text_input("中文字体", value="SimSun")
     en_font = st.sidebar.text_input("英文字体", value="Times New Roman")
-    heading_font = st.sidebar.text_input("标题字体", value="SimHei")
+    heading_cn_font = st.sidebar.text_input("标题中文字体", value="SimHei")
+    heading_en_font = st.sidebar.text_input("标题英文字体", value="Times New Roman")
     heading1_size = st.sidebar.number_input("标题字号 H1 (pt)", min_value=8, max_value=48, value=14)
     heading2_size = st.sidebar.number_input("标题字号 H2 (pt)", min_value=8, max_value=48, value=14)
     heading3_size = st.sidebar.number_input("标题字号 H3 (pt)", min_value=8, max_value=48, value=14)
@@ -67,7 +68,8 @@ def _sidebar_config() -> FormatConfig:
     return build_format_config(
         cn_font=cn_font,
         en_font=en_font,
-        heading_font=heading_font,
+        heading_cn_font=heading_cn_font,
+        heading_en_font=heading_en_font,
         heading1_size_pt=int(heading1_size),
         heading2_size_pt=int(heading2_size),
         heading3_size_pt=int(heading3_size),

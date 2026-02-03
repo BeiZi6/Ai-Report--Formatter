@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "formatter"
+version = "0.1.0"
+description = "Markdown → DOCX formatter utilities"
+requires-python = ">=3.9"
+authors = [{ name = "Proj1 Team" }]
+dependencies = [
+  "python-docx",
+  "markdown-it-py",
+  "mdit-py-plugins",
+  "latex2mathml",
+  "mathml2omml",
+]
+
+[project.optional-dependencies]
+app = ["streamlit"]
+
+[tool.setuptools]
+packages = ["formatter"]
+include-package-data = true

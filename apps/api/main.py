@@ -1,25 +1,17 @@
 from __future__ import annotations
 
-import sys
 import tempfile
-from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-
-# Ensure formatter package is importable when running via apps/api
-FORMATTER_PATH = Path(__file__).resolve().parents[1] / "formatter"
-if str(FORMATTER_PATH) not in sys.path:
-    sys.path.insert(0, str(FORMATTER_PATH))
-
-formatter_module = sys.modules.get("formatter")
-if formatter_module is not None and not hasattr(formatter_module, "__path__"):
-    del sys.modules["formatter"]
 
 from formatter.app_logic import build_preview_payload
 from formatter.docx_builder import build_docx
 from formatter.ui_config import build_format_config
+
+from .export_stats import get_export_stats, increment_export_count
+from .schemas import GenerateRequest, PreviewRequest
 
 app = FastAPI()
 
@@ -33,25 +25,34 @@ app.add_middleware(
 
 
 @app.post("/api/preview")
-async def preview(payload: dict) -> dict:
-    markdown = payload.get("markdown", "")
-    return build_preview_payload(markdown)
+async def preview(payload: PreviewRequest) -> dict:
+    return build_preview_payload(payload.markdown)
 
 
 @app.post("/api/generate")
-async def generate(payload: dict) -> Response:
-    config = payload.get("config", {})
-    markdown = payload.get("markdown", "")
-    preview_payload = build_preview_payload(markdown)
+async def generate(payload: GenerateRequest) -> Response:
+    preview_payload = build_preview_payload(payload.markdown)
 
-    format_config = build_format_config(**config)
+    try:
+        config_dict = payload.config.model_dump() if hasattr(payload.config, "model_dump") else dict(payload.config)
+        format_config = build_format_config(**config_dict)
+    except Exception as exc:  # defensive: surface config issues as 422
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     with tempfile.NamedTemporaryFile(suffix=".docx") as tmp:
         build_docx(preview_payload["ast"], tmp.name, config=format_config)
         tmp.seek(0)
         data = tmp.read()
+
+    increment_export_count()
 
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": "attachment; filename=ai-report.docx"},
     )
+
+
+@app.get("/api/exports/stats")
+async def export_stats() -> dict:
+    return get_export_stats()

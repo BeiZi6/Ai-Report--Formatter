@@ -74,7 +74,8 @@ def test_docx_applies_line_spacing_and_indents(tmp_path):
         ),
         heading_styles={
             1: HeadingStyle(
-                font="SimHei",
+                en_font="Times New Roman",
+                cn_font="SimHei",
                 size_pt=14,
                 line_spacing=1.25,
                 para_before_lines=0.5,
@@ -107,7 +108,8 @@ def test_docx_heading_color_is_black(tmp_path):
     config = FormatConfig(
         heading_styles={
             1: HeadingStyle(
-                font="SimHei",
+                en_font="Times New Roman",
+                cn_font="SimHei",
                 size_pt=14,
                 line_spacing=1.25,
                 para_before_lines=0.5,

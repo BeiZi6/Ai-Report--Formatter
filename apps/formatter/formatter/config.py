@@ -19,7 +19,8 @@ class BodyStyle:
 
 @dataclass
 class HeadingStyle:
-    font: str
+    en_font: str
+    cn_font: str
     size_pt: int
     line_spacing: float
     para_before_lines: float
@@ -29,28 +30,32 @@ class HeadingStyle:
 def _default_heading_styles(base: BodyStyle) -> dict[int, HeadingStyle]:
     return {
         1: HeadingStyle(
-            font=base.cn_font,
+            en_font=base.en_font,
+            cn_font=base.cn_font,
             size_pt=14,
             line_spacing=1.25,
             para_before_lines=0.5,
             para_after_lines=0.5,
         ),
         2: HeadingStyle(
-            font=base.cn_font,
+            en_font=base.en_font,
+            cn_font=base.cn_font,
             size_pt=14,
             line_spacing=1.25,
             para_before_lines=0.5,
             para_after_lines=0.5,
         ),
         3: HeadingStyle(
-            font=base.cn_font,
+            en_font=base.en_font,
+            cn_font=base.cn_font,
             size_pt=14,
             line_spacing=1.25,
             para_before_lines=0.5,
             para_after_lines=0.5,
         ),
         4: HeadingStyle(
-            font=base.cn_font,
+            en_font=base.en_font,
+            cn_font=base.cn_font,
             size_pt=14,
             line_spacing=1.25,
             para_before_lines=0.5,
