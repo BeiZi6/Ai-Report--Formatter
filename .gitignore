@@ -1,6 +1,9 @@
 # Worktrees
 .worktrees/
 
+# OS metadata
+.DS_Store
+
 # Python
 .venv/
 __pycache__/
