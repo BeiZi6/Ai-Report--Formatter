@@ -1,0 +1,92 @@
+name: Release GitHub
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example: v1.2.3)"
+        required: true
+        type: string
+      target:
+        description: "Branch or commit SHA to tag when missing (leave blank for default branch)"
+        required: false
+        type: string
+      create_tag_if_missing:
+        description: "Create and push the tag if it does not exist"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark this release as a pre-release"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-github-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure release tag exists
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          TARGET_INPUT: ${{ inputs.target }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          CREATE_TAG_IF_MISSING: ${{ inputs.create_tag_if_missing }}
+        run: |
+          set -euo pipefail
+
+          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists"
+            exit 0
+          fi
+
+          if [ "$CREATE_TAG_IF_MISSING" != "true" ]; then
+            echo "Tag $TAG does not exist and create_tag_if_missing=false"
+            exit 1
+          fi
+
+          TARGET="$TARGET_INPUT"
+          if [ -z "$TARGET" ]; then
+            TARGET="$DEFAULT_BRANCH"
+          fi
+
+          echo "Creating tag $TAG from $TARGET"
+          git tag "$TAG" "$TARGET"
+          git push origin "$TAG"
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release for tag $TAG already exists"
+            exit 1
+          fi
+
+          args=(release create "$TAG" --title "$TAG" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+
+          gh "${args[@]}"
+          gh release view "$TAG" --json url --jq '.url'
