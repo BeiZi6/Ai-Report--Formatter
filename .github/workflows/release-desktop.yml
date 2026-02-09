@@ -25,10 +25,6 @@ jobs:
             os: macos-14
             python_arch: arm64
             build_args: --mac --arm64
-          - id: mac-x64
-            os: macos-13
-            python_arch: x64
-            build_args: --mac --x64
           - id: win-x64
             os: windows-latest
             python_arch: x64
@@ -74,6 +70,10 @@ jobs:
       - name: Install web dependencies
         working-directory: apps/web
         run: npm ci
+
+      - name: Build web export for Electron tests
+        working-directory: apps/web
+        run: npm run build
 
       - name: Run Electron tests
         working-directory: apps/web

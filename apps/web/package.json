@@ -14,7 +14,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:electron": "node --test electron/__tests__/*.test.mjs",
+    "test:electron": "node --test \"electron/__tests__/*.test.mjs\"",
     "dev:desktop:web": "npm run dev",
     "dev:desktop:api": "node electron/scripts/run-python.mjs ../api/desktop_backend.py",
     "dev:desktop:electron": "wait-on tcp:3000 tcp:8000 && electron .",
