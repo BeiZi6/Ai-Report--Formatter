@@ -1,7 +1,8 @@
+// biome-ignore-all lint/security/noDangerouslySetInnerHtml: preview rendering requires HTML fragments generated from local backend parsing.
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { fetchExportStats, fetchPreview, generateDocx } from "../lib/api";
 
@@ -11,6 +12,7 @@ type PreviewPayload = {
     paragraphs?: number;
   };
   refs?: string[];
+  preview_html?: string;
 };
 
 type ExportStats = {
@@ -66,6 +68,9 @@ const DEFAULT_CONFIG: FormatConfig = {
   page_num_position: "center",
 };
 
+const PREVIEW_PAGE_WIDTH = 794;
+const PREVIEW_PAGE_HEIGHT = 1123;
+
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
   visible: (delay = 0) => ({
@@ -117,7 +122,7 @@ function WaveRibbon({ status, onGenerate, disabled }: WaveRibbonProps) {
           <span className="wave-status">{status}</span>
         </div>
         <div className="wave-verse" aria-hidden="true">
-          <span className="verse-text">待到秋来九月八  我花开后百花杀</span>
+          <span className="verse-text">我失骄杨君失柳,杨柳轻飏直上重霄九</span>
         </div>
         <div className="wave-actions">
           <button
@@ -135,6 +140,23 @@ function WaveRibbon({ status, onGenerate, disabled }: WaveRibbonProps) {
   );
 }
 
+type MeasurePage = {
+  content: HTMLDivElement;
+};
+
+const createMeasurePage = (host: HTMLDivElement): MeasurePage => {
+  const page = document.createElement("div");
+  page.className = "preview-page-measure";
+
+  const content = document.createElement("div");
+  content.className = "preview-page-content";
+
+  page.appendChild(content);
+  host.appendChild(page);
+
+  return { content };
+};
+
 export default function Home() {
   const [markdown, setMarkdown] = useState("");
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
@@ -143,6 +165,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [exportStats, setExportStats] = useState<ExportStats | null>(null);
   const [config, setConfig] = useState<FormatConfig>(DEFAULT_CONFIG);
+  const [previewPages, setPreviewPages] = useState<string[]>([]);
+  const [previewScale, setPreviewScale] = useState(1);
+  const [hasDesktopLogExport, setHasDesktopLogExport] = useState(false);
+  const [logExportMessage, setLogExportMessage] = useState<string | null>(null);
+  const previewMeasureRef = useRef<HTMLDivElement | null>(null);
+  const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const fontSizeOptions = [
     { label: "小四 (12pt)", value: 12 },
     { label: "四号 (14pt)", value: 14 },
@@ -154,17 +182,25 @@ export default function Home() {
 
   const isEmpty = markdown.trim().length === 0;
 
-  const refreshExportStats = async () => {
+  const refreshExportStats = useCallback(async () => {
     try {
       const data = await fetchExportStats();
       setExportStats(data);
     } catch {
       setExportStats(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshExportStats();
+  }, [refreshExportStats]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setHasDesktopLogExport(typeof window.desktop?.exportLogs === "function");
   }, []);
 
   useEffect(() => {
@@ -196,6 +232,77 @@ export default function Home() {
       controller.abort();
     };
   }, [markdown, isEmpty]);
+
+  useEffect(() => {
+    const viewport = previewViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const updateScale = () => {
+      const styles = window.getComputedStyle(viewport);
+      const paddingX =
+        Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+      const availableWidth = viewport.clientWidth - paddingX;
+      if (!availableWidth || Number.isNaN(availableWidth)) {
+        return;
+      }
+      const nextScale = Math.min(1, availableWidth / PREVIEW_PAGE_WIDTH);
+      setPreviewScale((prev) => (Math.abs(prev - nextScale) < 0.01 ? prev : nextScale));
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(viewport);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!preview?.preview_html) {
+      setPreviewPages([]);
+      return;
+    }
+
+    const host = previewMeasureRef.current;
+    if (!host) {
+      return;
+    }
+
+    host.innerHTML = "";
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(preview.preview_html, "text/html");
+    const nodes = Array.from(doc.body.children);
+
+    if (nodes.length === 0) {
+      setPreviewPages([preview.preview_html]);
+      return;
+    }
+
+    const pages: string[] = [];
+    let currentPage = createMeasurePage(host);
+
+    for (const node of nodes) {
+      currentPage.content.appendChild(node);
+      if (
+        currentPage.content.scrollHeight > PREVIEW_PAGE_HEIGHT + 1 &&
+        currentPage.content.childElementCount > 1
+      ) {
+        currentPage.content.removeChild(node);
+        pages.push(currentPage.content.innerHTML);
+        currentPage = createMeasurePage(host);
+        currentPage.content.appendChild(node);
+      }
+    }
+
+    if (currentPage.content.childElementCount > 0) {
+      pages.push(currentPage.content.innerHTML);
+    }
+
+    setPreviewPages(pages);
+  }, [preview?.preview_html]);
 
   const headingCount = preview?.summary?.headings ?? 0;
   const paragraphCount = preview?.summary?.paragraphs ?? 0;
@@ -232,6 +339,32 @@ export default function Home() {
     } finally {
       setIsGenerating(false);
       refreshExportStats();
+    }
+  };
+
+  const handleExportLogs = async () => {
+    if (typeof window === "undefined" || !window.desktop?.exportLogs) {
+      setLogExportMessage("当前环境不支持日志导出");
+      return;
+    }
+
+    try {
+      const result = await window.desktop.exportLogs();
+      if (result.ok) {
+        setLogExportMessage(
+          result.filePath ? `日志已导出：${result.filePath}` : "日志已成功导出",
+        );
+        return;
+      }
+
+      if (result.cancelled) {
+        setLogExportMessage("已取消日志导出");
+        return;
+      }
+
+      setLogExportMessage(result.error ? `日志导出失败：${result.error}` : "日志导出失败");
+    } catch {
+      setLogExportMessage("日志导出失败");
     }
   };
 
@@ -296,7 +429,7 @@ export default function Home() {
               value={markdown}
               onChange={(event) => setMarkdown(event.target.value)}
             />
-            <p className="hint">支持标题、列表、引用与参考文献标记 [1]</p>
+            <p className="hint">支持标题、列表、行内代码与引用标记 [1]</p>
           </div>
 
           <div className="settings-stack">
@@ -444,6 +577,7 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
+                  <p className="hint">倍行距</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="heading-para-before">标题段前</label>
@@ -462,6 +596,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：行</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="heading-para-after">标题段后</label>
@@ -480,6 +615,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：行</p>
                 </div>
               </div>
             </div>
@@ -562,6 +698,7 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
+                  <p className="hint">倍行距</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="para-before">正文段前</label>
@@ -580,6 +717,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：行</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="para-after">正文段后</label>
@@ -598,6 +736,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：行</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="indent-before">左缩进</label>
@@ -617,6 +756,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：字符</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="indent-after">右缩进</label>
@@ -636,6 +776,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：字符</p>
                 </div>
                 <div className="field compact">
                   <label htmlFor="indent-first-line">首行缩进</label>
@@ -655,6 +796,7 @@ export default function Home() {
                       }));
                     }}
                   />
+                  <p className="hint">单位：字符</p>
                 </div>
               </div>
             </div>
@@ -726,19 +868,64 @@ export default function Home() {
                     <li>正文字体：{config.cn_font} / {config.en_font}</li>
                     <li>标题字体：{config.heading_cn_font} / {config.heading_en_font}</li>
                   </ul>
+                  {preview?.preview_html ? (
+                    <>
+                      <div
+                        className="preview-html preview-pages"
+                        ref={previewViewportRef}
+                        style={{ "--preview-scale": previewScale } as CSSProperties}
+                      >
+                        {(previewPages.length ? previewPages : [preview.preview_html]).map(
+                          (pageHtml) => (
+                            <div className="preview-page-shell" key={pageHtml}>
+                              <div className="preview-page">
+                                <div
+                                  className="preview-page-content"
+                                  dangerouslySetInnerHTML={{ __html: pageHtml }}
+                                />
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                      <div
+                        className="preview-measure"
+                        ref={previewMeasureRef}
+                        aria-hidden="true"
+                        style={
+                          {
+                            "--preview-page-width": `${PREVIEW_PAGE_WIDTH}px`,
+                            "--preview-page-height": `${PREVIEW_PAGE_HEIGHT}px`,
+                            "--preview-page-padding": "72px",
+                          } as CSSProperties
+                        }
+                      />
+                    </>
+                  ) : null}
                 </>
               )}
             </div>
           </div>
 
-          <div className="note-box">
-            <h4>导出提示</h4>
-            <p>点击“生成 Word”后会自动下载 docx 文件，并保持当前样式。</p>
-            <p>
-              小提示：打开 Word 后按 <kbd>Ctrl/⌘ + A</kbd> 选中全文并更新域
-              (<kbd>F9</kbd>)，即可刷新公式/表格编号；块级公式已默认居中。
-            </p>
-          </div>
+            <div className="note-box">
+              <h4>导出提示</h4>
+              <p>点击“生成 Word”后会自动下载 docx 文件，并保持当前样式。</p>
+              <p>
+                表格单元格默认居中，块级公式自动按 (1) 样式编号并右侧对齐，无需在 Word 里手动刷新域。
+              </p>
+              <div className="action-row">
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  onClick={handleExportLogs}
+                  disabled={!hasDesktopLogExport}
+                  data-testid="btn-export-logs"
+                >
+                  导出运行日志
+                </button>
+              </div>
+              {logExportMessage ? <p className="hint">{logExportMessage}</p> : null}
+            </div>
         </motion.section>
       </motion.main>
 
