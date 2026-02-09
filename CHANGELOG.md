@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-02-09
+
+### Fixed
+
+- 修复 Windows 导出失败：`/api/generate` 改为使用内存流生成 docx，避免临时文件句柄锁冲突。
+- 新增回归测试，确保导出接口持续使用内存流输出。
+
 ### Added
 
 - Electron desktop release hardening (permission and navigation controls).

@@ -1,3 +1,5 @@
+import io
+
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
@@ -79,3 +81,48 @@ def test_generate_endpoint_accepts_paragraph_units():
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     assert len(response.content) > 0
+
+
+def test_generate_endpoint_builds_docx_in_memory_stream(monkeypatch):
+    client = TestClient(app)
+    captured = {"is_bytes_io": False}
+
+    def fake_build_docx(ast, output_path, config=None):
+        captured["is_bytes_io"] = isinstance(output_path, io.BytesIO)
+        output_path.write(b"fake-docx-bytes")
+
+    monkeypatch.setattr("apps.api.main.build_docx", fake_build_docx)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "markdown": "# Title\n\nHello.",
+            "config": {
+                "cn_font": "SimSun",
+                "en_font": "Times New Roman",
+                "heading_cn_font": "SimHei",
+                "heading_en_font": "Times New Roman",
+                "heading1_size_pt": 16,
+                "heading2_size_pt": 16,
+                "heading3_size_pt": 16,
+                "heading4_size_pt": 16,
+                "heading_line_spacing": 1.5,
+                "heading_para_before_lines": 0.0,
+                "heading_para_after_lines": 0.0,
+                "body_size_pt": 12,
+                "line_spacing": 1.5,
+                "para_before_lines": 0.0,
+                "para_after_lines": 0.0,
+                "indent_before_chars": 0,
+                "indent_after_chars": 0,
+                "first_line_indent_chars": 2,
+                "justify": True,
+                "clear_background": True,
+                "page_num_position": "center",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["is_bytes_io"] is True
+    assert response.content == b"fake-docx-bytes"

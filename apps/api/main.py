@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import io
 import os
-import tempfile
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,10 +59,9 @@ async def generate(payload: GenerateRequest) -> Response:
     except Exception as exc:  # defensive: surface config issues as 422
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    with tempfile.NamedTemporaryFile(suffix=".docx") as tmp:
-        build_docx(preview_payload["ast"], tmp.name, config=format_config)
-        tmp.seek(0)
-        data = tmp.read()
+    output_buffer = io.BytesIO()
+    build_docx(preview_payload["ast"], output_buffer, config=format_config)
+    data = output_buffer.getvalue()
 
     increment_export_count()
 
