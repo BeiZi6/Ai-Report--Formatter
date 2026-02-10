@@ -7,10 +7,19 @@ from .pipeline import format_markdown
 from .preview import build_export_quality_report, lint_structure, summarize_ast
 
 
-def build_preview_payload(text: str) -> dict[str, Any]:
-    result = format_markdown(text)
+def build_preview_payload(
+    text: str,
+    *,
+    bibliography_style: str = "ieee",
+    bibliography_sources: str = "",
+) -> dict[str, Any]:
+    result = format_markdown(
+        text,
+        bibliography_style=bibliography_style,
+        bibliography_sources=bibliography_sources,
+    )
     summary = summarize_ast(result["ast"])
-    preview_html = render_preview_html(text)
+    preview_html = render_preview_html(result["normalized_markdown"])
     lint_warnings = lint_structure(result["ast"], result["refs"])
     quality_report = build_export_quality_report(result["ast"], result["refs"], lint_warnings)
     return {

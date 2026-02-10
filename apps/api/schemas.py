@@ -1,12 +1,21 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 from pydantic import BaseModel, Field
 
 
+class BibliographyConfig(BaseModel):
+    style: Literal["ieee", "gbt", "apa"] = "ieee"
+    sources_text: str = ""
+
+    class Config:
+        extra = "forbid"
+
+
 class PreviewRequest(BaseModel):
     markdown: str = ""
+    bibliography: BibliographyConfig = Field(default_factory=lambda: BibliographyConfig())
 
     class Config:
         extra = "forbid"
@@ -33,7 +42,9 @@ class GenerateConfig(BaseModel):
     first_line_indent_chars: int = 2
     justify: bool = True
     clear_background: bool = True
-    page_num_position: str = Field("center", pattern="^(center|right)$")
+    page_num_position: Literal["center", "right"] = "center"
+    figure_max_width_cm: float = 14.0
+    figure_align: Literal["left", "center", "right"] = "center"
 
     class Config:
         extra = "forbid"
@@ -41,7 +52,8 @@ class GenerateConfig(BaseModel):
 
 class GenerateRequest(BaseModel):
     markdown: str
-    config: Dict[str, Any] | GenerateConfig = Field(default_factory=GenerateConfig)
+    config: Dict[str, Any] | GenerateConfig = Field(default_factory=lambda: GenerateConfig())
+    bibliography: BibliographyConfig = Field(default_factory=lambda: BibliographyConfig())
 
     class Config:
         extra = "forbid"

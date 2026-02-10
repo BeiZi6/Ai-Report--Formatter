@@ -9,7 +9,14 @@ _REF_RE = re.compile(r"^\[(\d+)\]$")
 
 
 def summarize_ast(ast: list[AstNode]) -> dict[str, int]:
-    counts = {"headings": 0, "paragraphs": 0, "lists": 0, "tables": 0, "math_blocks": 0}
+    counts = {
+        "headings": 0,
+        "paragraphs": 0,
+        "lists": 0,
+        "tables": 0,
+        "math_blocks": 0,
+        "figures": 0,
+    }
 
     def walk(nodes: list[AstNode]) -> None:
         for node in nodes:
@@ -28,6 +35,8 @@ def summarize_ast(ast: list[AstNode]) -> dict[str, int]:
                 counts["tables"] += 1
             elif ntype == "math_block":
                 counts["math_blocks"] += 1
+            elif ntype == "figure":
+                counts["figures"] += 1
 
     walk(ast)
     return counts
@@ -107,6 +116,8 @@ def build_export_quality_report(
         rules_applied.extend(["citations_sorted_and_deduplicated", "bibliography_auto_append"])
     if stats.get("math_blocks", 0) > 0:
         rules_applied.append("math_blocks_auto_numbered")
+    if stats.get("figures", 0) > 0:
+        rules_applied.append("figure_caption_numbering")
 
     has_blockquote = any(node.get("type") == "blockquote" for node in _walk_nodes(ast))
     if has_blockquote:

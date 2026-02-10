@@ -37,3 +37,34 @@ def test_pipeline_appends_bibliography_with_sorted_refs():
         "[1] 待补充参考文献",
         "[3] 待补充参考文献",
     ]
+
+
+def test_pipeline_uses_source_manager_with_key_citations():
+    result = format_markdown(
+        "# Title\n\nSee [@smith2024].",
+        bibliography_style="ieee",
+        bibliography_sources="""
+@article{smith2024,
+  author = {Smith, John},
+  title = {A Practical Study},
+  journal = {Journal of Testing},
+  year = {2024}
+}
+""",
+    )
+
+    assert result["refs"] == ["[1]"]
+    bibliography = result["ast"][-1]
+    assert bibliography["type"] == "list"
+    assert "A Practical Study" in bibliography["items"][0][0]["text"]
+
+
+def test_pipeline_renders_apa_style_without_bracket_prefix():
+    result = format_markdown(
+        "# Title\n\nSee [1].",
+        bibliography_style="apa",
+        bibliography_sources="[1] Wang, L. (2024). Report Writing.",
+    )
+
+    bibliography = result["ast"][-1]
+    assert bibliography["items"][0][0]["text"] == "Wang, L. (2024). Report Writing."

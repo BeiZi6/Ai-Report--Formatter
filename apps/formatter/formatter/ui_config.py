@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from formatter.config import BodyStyle, FormatConfig, HeadingStyle
+from formatter.config import BodyStyle, FigureStyle, FormatConfig, HeadingStyle
 
 
 def build_format_config(
@@ -27,6 +27,8 @@ def build_format_config(
     justify: bool,
     clear_background: bool,
     page_num_position: str,
+    figure_max_width_cm: float = 14.0,
+    figure_align: str = "center",
 ) -> FormatConfig:
     # Backward compatibility: if separate heading fonts are not provided, fall back to single heading_font
     resolved_heading_cn_font = heading_cn_font or heading_font or cn_font
@@ -61,6 +63,7 @@ def build_format_config(
     return FormatConfig(
         body_style=body_style,
         heading_styles=heading_styles,
+        figure_style=FigureStyle(max_width_cm=figure_max_width_cm, align=figure_align),
         clear_background=clear_background,
         page_num_position=page_num_position,
     )

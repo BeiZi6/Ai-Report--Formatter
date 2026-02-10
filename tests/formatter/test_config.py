@@ -7,6 +7,8 @@ def test_default_config_has_heading_styles():
     assert config.heading_styles[1].en_font
     assert config.heading_styles[1].cn_font
     assert config.heading_styles[1].size_pt > config.body_style.size_pt
+    assert config.figure_style.max_width_cm > 0
+    assert config.figure_style.align in {"left", "center", "right"}
 
 
 def test_heading_styles_can_be_overridden_and_filled():

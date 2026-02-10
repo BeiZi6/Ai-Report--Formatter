@@ -1,8 +1,15 @@
+import base64
+
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX, WD_ALIGN_PARAGRAPH
 
 from formatter.config import FormatConfig
 from formatter.docx_builder import build_docx
+
+
+ONE_PIXEL_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6p8L8AAAAASUVORK5CYII="
+)
 
 
 def test_build_docx_creates_docx(tmp_path):
@@ -484,3 +491,36 @@ def test_build_docx_renders_blockquotes(tmp_path):
     paragraph = doc.paragraphs[0]
     assert paragraph.text == "quoted"
     assert 'w:left="420"' in paragraph._p.xml
+
+
+def test_build_docx_renders_figures_with_caption_numbering(tmp_path):
+    image_path = tmp_path / "figure.png"
+    image_path.write_bytes(ONE_PIXEL_PNG)
+
+    ast = [
+        {
+            "type": "figure",
+            "src": str(image_path),
+            "alt": "架构图",
+            "caption": "系统总体架构",
+        },
+        {
+            "type": "figure",
+            "src": str(image_path),
+            "alt": "流程图",
+            "caption": "数据处理流程",
+        },
+    ]
+
+    config = FormatConfig()
+    config.figure_style.max_width_cm = 5.0
+    config.figure_style.align = "center"
+
+    output = tmp_path / "out.docx"
+    build_docx(ast, output, config)
+
+    doc = Document(output)
+    paragraph_texts = [paragraph.text for paragraph in doc.paragraphs if paragraph.text]
+    assert "图 1 系统总体架构" in paragraph_texts
+    assert "图 2 数据处理流程" in paragraph_texts
+    assert "graphicData" in doc.part._element.xml

@@ -198,3 +198,16 @@ def test_parse_markdown_footnotes_append_footnote_section():
     }
     assert ast[-1]["type"] == "paragraph"
     assert ast[-1]["text"] == "[1] 脚注内容"
+
+
+def test_parse_markdown_image_generates_figure_node():
+    ast = parse_markdown('![系统架构图](https://example.com/arch.png "总体架构")')
+
+    assert ast == [
+        {
+            "type": "figure",
+            "src": "https://example.com/arch.png",
+            "alt": "系统架构图",
+            "caption": "总体架构",
+        }
+    ]

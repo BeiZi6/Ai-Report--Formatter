@@ -40,21 +40,32 @@ app.add_middleware(
 
 
 @app.get("/healthz")
-async def healthz() -> dict:
+async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.post("/api/preview")
-async def preview(payload: PreviewRequest) -> dict:
-    return build_preview_payload(payload.markdown)
+async def preview(payload: PreviewRequest) -> dict[str, object]:
+    return build_preview_payload(
+        payload.markdown,
+        bibliography_style=payload.bibliography.style,
+        bibliography_sources=payload.bibliography.sources_text,
+    )
 
 
 @app.post("/api/generate")
 async def generate(payload: GenerateRequest) -> Response:
-    preview_payload = build_preview_payload(payload.markdown)
+    preview_payload = build_preview_payload(
+        payload.markdown,
+        bibliography_style=payload.bibliography.style,
+        bibliography_sources=payload.bibliography.sources_text,
+    )
 
     try:
-        config_dict = payload.config.model_dump() if hasattr(payload.config, "model_dump") else dict(payload.config)
+        if isinstance(payload.config, dict):
+            config_dict = dict(payload.config)
+        else:
+            config_dict = payload.config.model_dump()
         format_config = build_format_config(**config_dict)
     except Exception as exc:  # defensive: surface config issues as 422
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -73,5 +84,5 @@ async def generate(payload: GenerateRequest) -> Response:
 
 
 @app.get("/api/exports/stats")
-async def export_stats() -> dict:
+async def export_stats() -> dict[str, int]:
     return get_export_stats()

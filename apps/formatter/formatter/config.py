@@ -27,6 +27,12 @@ class HeadingStyle:
     para_after_lines: float
 
 
+@dataclass
+class FigureStyle:
+    max_width_cm: float = 14.0
+    align: str = "center"
+
+
 def _default_heading_styles(base: BodyStyle) -> dict[int, HeadingStyle]:
     return {
         1: HeadingStyle(
@@ -68,6 +74,7 @@ def _default_heading_styles(base: BodyStyle) -> dict[int, HeadingStyle]:
 class FormatConfig:
     body_style: BodyStyle = field(default_factory=BodyStyle)
     heading_styles: dict[int, HeadingStyle] = field(default_factory=dict)
+    figure_style: FigureStyle = field(default_factory=FigureStyle)
     clear_background: bool = True
     page_num_position: str = "center"
 

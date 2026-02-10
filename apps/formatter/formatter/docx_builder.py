@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import base64
+import io
+import os
 from typing import Any
+from urllib.parse import unquote, urlparse
+from urllib.request import urlopen
 
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX, WD_PARAGRAPH_ALIGNMENT
@@ -235,6 +240,76 @@ def _add_code_block(doc, node: Node) -> None:
         run.font.size = Pt(10)
 
 
+def _figure_alignment(align: str):
+    if align == "left":
+        return WD_PARAGRAPH_ALIGNMENT.LEFT
+    if align == "right":
+        return WD_PARAGRAPH_ALIGNMENT.RIGHT
+    return WD_PARAGRAPH_ALIGNMENT.CENTER
+
+
+def _load_figure_source(src: str):
+    if not src:
+        return None
+
+    if src.startswith("data:image"):
+        try:
+            _, payload = src.split(",", 1)
+            return io.BytesIO(base64.b64decode(payload))
+        except Exception:
+            return None
+
+    parsed = urlparse(src)
+    if parsed.scheme in {"http", "https"}:
+        try:
+            with urlopen(src, timeout=8) as response:
+                return io.BytesIO(response.read())
+        except Exception:
+            return None
+
+    if parsed.scheme == "file":
+        local_path = unquote(parsed.path)
+        if os.path.exists(local_path):
+            return local_path
+        return None
+
+    if os.path.exists(src):
+        return src
+
+    return None
+
+
+def _add_figure(doc, node: Node, config: FormatConfig, figure_index: int) -> int:
+    src = str(node.get("src", "")).strip()
+    source = _load_figure_source(src)
+    alignment = _figure_alignment(config.figure_style.align)
+
+    if source is None:
+        fallback = doc.add_paragraph(f"[图片加载失败] {src}" if src else "[图片加载失败]")
+        fallback.alignment = alignment
+        return figure_index
+
+    picture_paragraph = doc.add_paragraph("")
+    picture_paragraph.alignment = alignment
+
+    try:
+        width_cm = max(1.0, float(config.figure_style.max_width_cm))
+    except Exception:
+        width_cm = 14.0
+
+    picture_paragraph.add_run().add_picture(source, width=Cm(width_cm))
+
+    caption_text = str(node.get("caption") or node.get("alt") or "").strip()
+    if caption_text:
+        caption = f"图 {figure_index} {caption_text}"
+    else:
+        caption = f"图 {figure_index}"
+
+    caption_paragraph = doc.add_paragraph(caption)
+    caption_paragraph.alignment = alignment
+    return figure_index + 1
+
+
 def _list_style_name(ordered: bool, level: int) -> str:
     base = "List Number" if ordered else "List Bullet"
     if level <= 1:
@@ -252,7 +327,14 @@ def _add_math_block(paragraph, latex: str, center_tab: int, right_tab: int) -> N
     _add_equation_number_field(paragraph)
 
 
-def _add_list(doc, node: Node, config: FormatConfig, center_tab: int, right_tab: int) -> None:
+def _add_list(
+    doc,
+    node: Node,
+    config: FormatConfig,
+    center_tab: int,
+    right_tab: int,
+    figure_state: dict[str, int],
+) -> None:
     for item in node.get("items", []):
         for child in item:
             if child.get("type") == "paragraph":
@@ -267,7 +349,7 @@ def _add_list(doc, node: Node, config: FormatConfig, center_tab: int, right_tab:
                 _add_runs(paragraph, runs, fallback_text)
                 _apply_list_indents(paragraph, node.get("level", 1))
             elif child.get("type") == "list":
-                _add_list(doc, child, config, center_tab, right_tab)
+                _add_list(doc, child, config, center_tab, right_tab, figure_state)
             elif child.get("type") == "math_block":
                 paragraph = doc.add_paragraph("", style=_list_style_name(node.get("ordered", False), node.get("level", 1)))
                 _add_math_block(paragraph, child.get("latex", ""), center_tab, right_tab)
@@ -276,9 +358,18 @@ def _add_list(doc, node: Node, config: FormatConfig, center_tab: int, right_tab:
                 _add_table(doc, child)
             elif child.get("type") == "code_block":
                 _add_code_block(doc, child)
+            elif child.get("type") == "figure":
+                figure_state["index"] = _add_figure(doc, child, config, figure_state["index"])
 
 
-def _add_blockquote(doc, node: Node, config: FormatConfig, center_tab: int, right_tab: int) -> None:
+def _add_blockquote(
+    doc,
+    node: Node,
+    config: FormatConfig,
+    center_tab: int,
+    right_tab: int,
+    figure_state: dict[str, int],
+) -> None:
     for child in node.get("children", []):
         if child.get("type") == "paragraph":
             paragraph = doc.add_paragraph("")
@@ -289,7 +380,7 @@ def _add_blockquote(doc, node: Node, config: FormatConfig, center_tab: int, righ
                 if run.italic is None:
                     run.italic = True
         elif child.get("type") == "list":
-            _add_list(doc, child, config, center_tab, right_tab)
+            _add_list(doc, child, config, center_tab, right_tab, figure_state)
         elif child.get("type") == "table":
             _add_table(doc, child)
         elif child.get("type") == "math_block":
@@ -298,6 +389,8 @@ def _add_blockquote(doc, node: Node, config: FormatConfig, center_tab: int, righ
             paragraph.paragraph_format.left_indent = Pt(21)
         elif child.get("type") == "code_block":
             _add_code_block(doc, child)
+        elif child.get("type") == "figure":
+            figure_state["index"] = _add_figure(doc, child, config, figure_state["index"])
 
 
 def _cell_alignment(align: str):
@@ -445,6 +538,8 @@ def build_docx(ast: list[Node], output_path, config: FormatConfig | None = None)
         right_tab = 9350
         center_tab = 4675
 
+    figure_state = {"index": 1}
+
     for node in ast:
         if node.get("type") == "heading":
             paragraph = doc.add_heading("", level=node.get("level", 1))
@@ -464,7 +559,7 @@ def build_docx(ast: list[Node], output_path, config: FormatConfig | None = None)
                 config.body_style.first_line_indent_chars, config.body_style.size_pt
             )
         elif node.get("type") == "list":
-            _add_list(doc, node, config, center_tab, right_tab)
+            _add_list(doc, node, config, center_tab, right_tab, figure_state)
         elif node.get("type") == "table":
             _add_table(doc, node)
         elif node.get("type") == "math_block":
@@ -473,6 +568,8 @@ def build_docx(ast: list[Node], output_path, config: FormatConfig | None = None)
         elif node.get("type") == "code_block":
             _add_code_block(doc, node)
         elif node.get("type") == "blockquote":
-            _add_blockquote(doc, node, config, center_tab, right_tab)
+            _add_blockquote(doc, node, config, center_tab, right_tab, figure_state)
+        elif node.get("type") == "figure":
+            figure_state["index"] = _add_figure(doc, node, config, figure_state["index"])
 
     doc.save(output_path)

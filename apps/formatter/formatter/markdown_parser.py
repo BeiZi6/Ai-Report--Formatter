@@ -229,6 +229,26 @@ def _build_inline_nodes(token) -> list[AstNode]:
         if child.type == "html_inline" and "task-list-item-checkbox" in (child.content or ""):
             task_checked = "checked" in (child.content or "")
             continue
+        if child.type == "image":
+            _flush_inline_paragraph(nodes, runs, task_checked)
+            runs = []
+            task_checked = None
+
+            src = (child.attrGet("src") or "").strip()
+            if not src:
+                continue
+
+            alt = (child.content or "").strip()
+            caption = (child.attrGet("title") or "").strip() or alt
+            nodes.append(
+                {
+                    "type": "figure",
+                    "src": src,
+                    "alt": alt,
+                    "caption": caption,
+                }
+            )
+            continue
         if child.type == "math_inline_double":
             _flush_inline_paragraph(nodes, runs, task_checked)
             runs = []

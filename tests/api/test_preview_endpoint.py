@@ -45,3 +45,28 @@ def test_preview_endpoint_returns_structure_warnings():
     payload = response.json()
     codes = {item["code"] for item in payload["lint_warnings"]}
     assert "heading_level_jump" in codes
+
+
+def test_preview_endpoint_supports_bibliography_source_manager():
+    client = TestClient(app)
+    response = client.post(
+        "/api/preview",
+        json={
+            "markdown": "# Title\n\nSee [@smith2024].",
+            "bibliography": {
+                "style": "ieee",
+                "sources_text": """
+@article{smith2024,
+  author = {Smith, John},
+  title = {A Practical Study},
+  journal = {Journal of Testing},
+  year = {2024}
+}
+""",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["refs"] == ["[1]"]
