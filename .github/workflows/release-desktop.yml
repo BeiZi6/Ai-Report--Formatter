@@ -115,6 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
+          MATRIX_ID: ${{ matrix.id }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -131,7 +132,17 @@ jobs:
             exit 1
           fi
 
-          gh release upload "$TAG" "${assets[@]}" --clobber
+          upload_assets=()
+          for asset in "${assets[@]}"; do
+            filename="$(basename "$asset")"
+            extension="${filename##*.}"
+            stem="${filename%.*}"
+            renamed="dist-electron/${stem}-${MATRIX_ID}.${extension}"
+            cp "$asset" "$renamed"
+            upload_assets+=("$renamed")
+          done
+
+          gh release upload "$TAG" "${upload_assets[@]}" --clobber
 
       - name: Upload desktop artifacts
         if: always()
