@@ -5,3 +5,5 @@ def test_build_preview_payload_returns_summary_and_refs():
     payload = build_preview_payload("# Title\n\nHello [1].")
     assert payload["summary"]["headings"] == 1
     assert payload["refs"] == ["[1]"]
+    assert payload["lint_warnings"] == []
+    assert "quality_report" in payload

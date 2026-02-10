@@ -14,6 +14,8 @@ def test_preview_endpoint_returns_summary_and_refs():
     payload = response.json()
     assert payload["summary"]["headings"] == 1
     assert payload["refs"] == ["[1]"]
+    assert payload["lint_warnings"] == []
+    assert payload["quality_report"]["stats"]["refs"] == 1
 
 
 def test_preview_endpoint_includes_html_preview():
@@ -30,3 +32,16 @@ def test_preview_endpoint_includes_html_preview():
     html = payload.get("preview_html", "")
     assert "<code>" in html
     assert "<table" in html
+
+
+def test_preview_endpoint_returns_structure_warnings():
+    client = TestClient(app)
+    response = client.post(
+        "/api/preview",
+        json={"markdown": "# 一级\n\n#### 四级"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    codes = {item["code"] for item in payload["lint_warnings"]}
+    assert "heading_level_jump" in codes
