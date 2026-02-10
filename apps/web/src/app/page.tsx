@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { DecryptedText, ShinyText } from "@/components/reactbits";
+import { AnimatedContent, BlurText, DecryptedText, GradualBlur, ShinyText, Squares } from "@/components/reactbits";
+import ThemeSelector from "@/components/theme/ThemeSelector";
 import { fetchExportStats, fetchPreview, generateDocx } from "../lib/api";
 
 const GlitchText = dynamic(() => import("@/components/reactbits/GlitchText"), {
@@ -20,6 +21,23 @@ type PreviewPayload = {
   };
   refs?: string[];
   preview_html?: string;
+  lint_warnings?: Array<{
+    code: string;
+    severity: string;
+    message: string;
+  }>;
+  quality_report?: {
+    rules_applied?: string[];
+    risks?: string[];
+    stats?: {
+      headings?: number;
+      paragraphs?: number;
+      lists?: number;
+      tables?: number;
+      math_blocks?: number;
+      refs?: number;
+    };
+  };
 };
 
 type ExportStats = {
@@ -111,6 +129,30 @@ type WaveRibbonProps = {
   disabled: boolean;
 };
 
+type ValueCard = {
+  title: string;
+  body: string;
+  metric: string;
+};
+
+const valueCards: ValueCard[] = [
+  {
+    title: "结构预览先行",
+    body: "输入 Markdown 后先看结构与分页，再决定导出，减少反复返工。",
+    metric: "Preview-first",
+  },
+  {
+    title: "排版参数可控",
+    body: "标题、正文、缩进、行距分别可配，适配课程与企业模板要求。",
+    metric: "Granular config",
+  },
+  {
+    title: "离线导出稳定",
+    body: "本地链路优先，文档导出可用性更高，适合桌面端长期使用。",
+    metric: "Offline-ready",
+  },
+];
+
 function WaveRibbon({ status, onGenerate, disabled }: WaveRibbonProps) {
   return (
     <div className="wave-wrap" aria-hidden={false}>
@@ -134,13 +176,14 @@ function WaveRibbon({ status, onGenerate, disabled }: WaveRibbonProps) {
 
       <div className="wave-content">
         <div className="wave-meta">
-          <span className="label">DEV · Monochrome</span>
+          <span className="label">STYLE · Switchable</span>
           <span className="wave-status">{status}</span>
         </div>
         <div className="wave-verse" aria-hidden="true">
           <span className="verse-text">我失骄杨君失柳,杨柳轻飏直上重霄九</span>
         </div>
         <div className="wave-actions">
+          <ThemeSelector />
           <button
             type="button"
             className="primary-btn strong"
@@ -153,6 +196,28 @@ function WaveRibbon({ status, onGenerate, disabled }: WaveRibbonProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ValueStrip() {
+  return (
+    <section className="value-strip" data-testid="rb-value-strip" aria-label="核心能力概览">
+      {valueCards.map((card, index) => (
+        <AnimatedContent
+          key={card.title}
+          className="value-strip-item"
+          distance={30 + index * 10}
+          delay={index * 0.04}
+          threshold={0.16}
+        >
+          <article className="value-card">
+            <p className="value-card-metric">{card.metric}</p>
+            <h3 className="value-card-title">{card.title}</h3>
+            <p className="value-card-body">{card.body}</p>
+          </article>
+        </AnimatedContent>
+      ))}
+    </section>
   );
 }
 
@@ -185,6 +250,9 @@ export default function Home() {
   const [previewScale, setPreviewScale] = useState(1);
   const [hasDesktopLogExport, setHasDesktopLogExport] = useState(false);
   const [logExportMessage, setLogExportMessage] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [batchMessage, setBatchMessage] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const previewMeasureRef = useRef<HTMLDivElement | null>(null);
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const fontSizeOptions = [
@@ -384,8 +452,102 @@ export default function Home() {
     }
   };
 
+  const handleImportMarkdownFile = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    // Allow importing the same file repeatedly.
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setMarkdown(text);
+      setImportMessage(`已导入：${file.name}`);
+    } catch {
+      setImportMessage("导入失败：无法读取文件");
+    }
+  };
+
+  const handleMarkdownDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleMarkdownDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleMarkdownDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".md")) {
+      setImportMessage("仅支持 .md 文件拖拽导入");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setMarkdown(text);
+      setImportMessage(`已导入：${file.name}`);
+    } catch {
+      setImportMessage("导入失败：无法读取文件");
+    }
+  };
+
+  const handleBatchExport = async () => {
+    const parts = markdown
+      .split(/\n\s*---\s*\n/g)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length < 2) {
+      setBatchMessage("批量导出至少需要两段内容（用 --- 分隔）");
+      return;
+    }
+
+    try {
+      for (let i = 0; i < parts.length; i += 1) {
+        // Reuse the current config for each document.
+        const blob = await generateDocx(parts[i], config);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `ai-report-${String(i + 1).padStart(2, "0")}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
+      setBatchMessage("批量导出任务已完成");
+      refreshExportStats();
+    } catch {
+      setBatchMessage("批量导出失败，请稍后重试");
+    }
+  };
+
   return (
-    <div className="page">
+    <div className="page-shell">
+      <div className="bg-squares-layer" data-testid="rb-bg-squares" aria-hidden="true">
+        <Squares
+          direction="right"
+          speed={0.2}
+          gravity={0.45}
+          squareSize={64}
+          borderColor="rgba(153, 107, 255, 0.28)"
+          hoverFillColor="rgba(255, 214, 74, 0.2)"
+        />
+      </div>
+      <div className="page" data-ui-glass="fluid">
       <a className="skip-link" href="#main-content">
         跳到主要内容
       </a>
@@ -401,10 +563,17 @@ export default function Home() {
         custom={0}
       >
         <div className="hero-badge">
-          <GlitchText className="hero-badge-glitch" enableOnHover={false} speed={0.9}>
+          <GlitchText className="hero-badge-glitch" enableOnHover speed={0.8} enableShadows={false}>
             FastAPI · Next.js · Word
           </GlitchText>
         </div>
+        <BlurText
+          text="本地优先 · 学术级版式 · 一键导出"
+          className="hero-blur"
+          animateBy="words"
+          delay={80}
+          dataTestId="rb-hero-blur"
+        />
         <h1 className="hero-title">AI 报告排版助手</h1>
         <p className="hero-subtitle">
           把 Markdown 变成干净、专业、可交付的 Word 文档。
@@ -429,6 +598,10 @@ export default function Home() {
         </div>
       </motion.header>
 
+      <motion.section className="value-strip-wrap" variants={fadeUp} initial="hidden" animate="visible" custom={0.05}>
+        <ValueStrip />
+      </motion.section>
+
       <motion.main
         id="main-content"
         className="workspace"
@@ -437,6 +610,7 @@ export default function Home() {
         animate="visible"
         custom={0.1}
       >
+        <GradualBlur className="gradual-blur-wrap" maxBlur={6} maxOffset={10} minOpacity={0.86}>
         <motion.section className="panel" variants={fadeUp} custom={0.2}>
           <div className="panel-header">
             <div>
@@ -451,12 +625,28 @@ export default function Home() {
             <textarea
               id="markdown"
               name="markdown"
+              className={isDragOver ? "markdown-dropzone is-active" : "markdown-dropzone"}
               placeholder="# 报告标题\n\n从这里开始写内容..."
               rows={12}
               value={markdown}
               onChange={(event) => setMarkdown(event.target.value)}
+              onDragOver={handleMarkdownDragOver}
+              onDragLeave={handleMarkdownDragLeave}
+              onDrop={handleMarkdownDrop}
             />
             <p className="hint">支持标题、列表、行内代码与引用标记 [1]</p>
+          </div>
+
+          <div className="field">
+            <label htmlFor="markdown-import">从文件导入</label>
+            <input
+              id="markdown-import"
+              type="file"
+              accept=".md,text/markdown"
+              onChange={handleImportMarkdownFile}
+            />
+            {importMessage ? <p className="hint">{importMessage}</p> : null}
+            <p className="hint">提示：批量导出可用一行 `---` 分隔多份文档</p>
           </div>
 
           <div className="settings-stack">
@@ -838,6 +1028,15 @@ export default function Home() {
               清空内容
             </button>
             <button
+              className="ghost-btn"
+              type="button"
+              onClick={handleBatchExport}
+              disabled={isEmpty || isGenerating}
+              aria-disabled={isEmpty || isGenerating}
+            >
+              批量导出
+            </button>
+            <button
               className="primary-btn"
               type="button"
               onClick={handleGenerate}
@@ -848,6 +1047,8 @@ export default function Home() {
                 {isGenerating ? "生成中…" : "生成 Word"}
               </button>
             </div>
+
+          {batchMessage ? <p className="hint">{batchMessage}</p> : null}
 
           {error ? <p className="error-text">{error}</p> : null}
         </motion.section>
@@ -895,6 +1096,35 @@ export default function Home() {
                     <li>正文字体：{config.cn_font} / {config.en_font}</li>
                     <li>标题字体：{config.heading_cn_font} / {config.heading_en_font}</li>
                   </ul>
+                  <div className="note-box" data-testid="lint-box">
+                    <h4>结构质检</h4>
+                    {preview?.lint_warnings?.length ? (
+                      <ul>
+                        {preview.lint_warnings.map((warning) => (
+                          <li key={`${warning.code}-${warning.message}`}>{warning.message}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="hint">未发现结构风险。</p>
+                    )}
+                  </div>
+                  {preview?.quality_report ? (
+                    <div className="note-box" data-testid="quality-box">
+                      <h4>导出质量报告</h4>
+                      <p className="hint">
+                        规则：{preview.quality_report.rules_applied?.join(" · ") ?? "—"}
+                      </p>
+                      {preview.quality_report.risks?.length ? (
+                        <ul>
+                          {preview.quality_report.risks.map((risk) => (
+                            <li key={risk}>{risk}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="hint">风险：未检测到明显风险项。</p>
+                      )}
+                    </div>
+                  ) : null}
                   {preview?.preview_html ? (
                     <>
                       <div
@@ -954,7 +1184,8 @@ export default function Home() {
               {logExportMessage ? <p className="hint">{logExportMessage}</p> : null}
             </div>
         </motion.section>
-      </motion.main>
+        </motion.main>
+      </GradualBlur>
 
       <footer className="page-footer">
         <p>
