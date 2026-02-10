@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX, WD_PARAGRAPH_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
@@ -8,6 +10,8 @@ from docx.shared import Cm, Pt, RGBColor
 
 from formatter.config import FormatConfig
 from formatter.latex import latex_to_omml
+
+Node = dict[str, Any]
 
 
 def _set_style_fonts(style, ascii_font: str, east_asia_font: str | None = None) -> None:
@@ -134,7 +138,7 @@ def _add_equation_number_field(paragraph) -> None:
     paragraph.add_run(")")
 
 
-def _apply_run_styles(docx_run, run: dict) -> None:
+def _apply_run_styles(docx_run, run: Node) -> None:
     docx_run.bold = bool(run.get("bold"))
     docx_run.italic = bool(run.get("italic"))
     if run.get("strike"):
@@ -149,6 +153,9 @@ def _apply_run_styles(docx_run, run: dict) -> None:
         docx_run.font.name = "Consolas"
         if not run.get("highlight"):
             docx_run.font.highlight_color = WD_COLOR_INDEX.GRAY_25
+    if run.get("link"):
+        docx_run.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+        docx_run.font.underline = True
 
 
 def _ensure_omml_namespace(omml: str) -> str:
@@ -167,7 +174,7 @@ def _ensure_omml_namespace(omml: str) -> str:
     )
 
 
-def _add_runs(paragraph, runs: list[dict], fallback_text: str = "") -> None:
+def _add_runs(paragraph, runs: list[Node], fallback_text: str = "") -> None:
     if not runs:
         if fallback_text:
             paragraph.add_run(fallback_text)
@@ -183,10 +190,10 @@ def _add_runs(paragraph, runs: list[dict], fallback_text: str = "") -> None:
         _apply_run_styles(docx_run, run)
 
 
-def _trim_leading_text_runs(runs: list[dict]) -> list[dict]:
+def _trim_leading_text_runs(runs: list[Node]) -> list[Node]:
     if not runs:
         return runs
-    trimmed_runs: list[dict] = []
+    trimmed_runs: list[Node] = []
     trimmed = False
     for run in runs:
         if run.get("type") == "math":
@@ -207,7 +214,7 @@ def _trim_leading_text_runs(runs: list[dict]) -> list[dict]:
     return trimmed_runs
 
 
-def _add_code_block(doc, node: dict) -> None:
+def _add_code_block(doc, node: Node) -> None:
     paragraph = doc.add_paragraph("")
     paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
     paragraph.paragraph_format.first_line_indent = Pt(0)
@@ -245,13 +252,19 @@ def _add_math_block(paragraph, latex: str, center_tab: int, right_tab: int) -> N
     _add_equation_number_field(paragraph)
 
 
-def _add_list(doc, node: dict, config: FormatConfig, center_tab: int, right_tab: int) -> None:
+def _add_list(doc, node: Node, config: FormatConfig, center_tab: int, right_tab: int) -> None:
     for item in node.get("items", []):
         for child in item:
             if child.get("type") == "paragraph":
                 style_name = _list_style_name(node.get("ordered", False), node.get("level", 1))
                 paragraph = doc.add_paragraph("", style=style_name)
-                _add_runs(paragraph, child.get("runs", []), child.get("text", ""))
+                runs = child.get("runs", [])
+                fallback_text = child.get("text", "")
+                if child.get("task"):
+                    paragraph.add_run("☑ " if child.get("checked") else "☐ ")
+                    runs = _trim_leading_text_runs(runs)
+                    fallback_text = fallback_text.lstrip()
+                _add_runs(paragraph, runs, fallback_text)
                 _apply_list_indents(paragraph, node.get("level", 1))
             elif child.get("type") == "list":
                 _add_list(doc, child, config, center_tab, right_tab)
@@ -263,6 +276,28 @@ def _add_list(doc, node: dict, config: FormatConfig, center_tab: int, right_tab:
                 _add_table(doc, child)
             elif child.get("type") == "code_block":
                 _add_code_block(doc, child)
+
+
+def _add_blockquote(doc, node: Node, config: FormatConfig, center_tab: int, right_tab: int) -> None:
+    for child in node.get("children", []):
+        if child.get("type") == "paragraph":
+            paragraph = doc.add_paragraph("")
+            _add_runs(paragraph, child.get("runs", []), child.get("text", ""))
+            paragraph.paragraph_format.left_indent = Pt(21)
+            paragraph.paragraph_format.first_line_indent = Pt(0)
+            for run in paragraph.runs:
+                if run.italic is None:
+                    run.italic = True
+        elif child.get("type") == "list":
+            _add_list(doc, child, config, center_tab, right_tab)
+        elif child.get("type") == "table":
+            _add_table(doc, child)
+        elif child.get("type") == "math_block":
+            paragraph = doc.add_paragraph("")
+            _add_math_block(paragraph, child.get("latex", ""), center_tab, right_tab)
+            paragraph.paragraph_format.left_indent = Pt(21)
+        elif child.get("type") == "code_block":
+            _add_code_block(doc, child)
 
 
 def _cell_alignment(align: str):
@@ -314,7 +349,7 @@ def _apply_header_bottom_border(row) -> None:
         tc_borders.append(bottom)
 
 
-def _add_table(doc, node: dict) -> None:
+def _add_table(doc, node: Node) -> None:
     header = node.get("header", [])
     rows = node.get("rows", [])
     if not header:
@@ -345,7 +380,7 @@ def _add_table(doc, node: dict) -> None:
             _apply_header_bottom_border(table.rows[r_idx])
 
 
-def build_docx(ast: list[dict], output_path, config: FormatConfig | None = None) -> None:
+def build_docx(ast: list[Node], output_path, config: FormatConfig | None = None) -> None:
     config = config or FormatConfig()
     doc = Document()
 
@@ -437,5 +472,7 @@ def build_docx(ast: list[dict], output_path, config: FormatConfig | None = None)
             _add_math_block(paragraph, node.get("latex", ""), center_tab, right_tab)
         elif node.get("type") == "code_block":
             _add_code_block(doc, node)
+        elif node.get("type") == "blockquote":
+            _add_blockquote(doc, node, config, center_tab, right_tab)
 
     doc.save(output_path)

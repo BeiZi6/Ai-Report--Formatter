@@ -431,3 +431,56 @@ def test_table_uses_three_line_style(tmp_path):
     assert 'w:bottom w:val="single" w:sz="12"' in tbl_xml
     assert 'w:bottom w:val="single" w:sz="6"' in tbl_xml
     assert "insideV" not in tbl_xml
+
+
+def test_build_docx_renders_task_list_checkboxes(tmp_path):
+    ast = [
+        {
+            "type": "list",
+            "ordered": False,
+            "level": 1,
+            "start": 1,
+            "items": [
+                [
+                    {
+                        "type": "paragraph",
+                        "text": "done",
+                        "task": True,
+                        "checked": True,
+                        "runs": [{"text": "done", "code": False}],
+                    }
+                ],
+                [
+                    {
+                        "type": "paragraph",
+                        "text": "todo",
+                        "task": True,
+                        "checked": False,
+                        "runs": [{"text": "todo", "code": False}],
+                    }
+                ],
+            ],
+        }
+    ]
+    output = tmp_path / "out.docx"
+    build_docx(ast, output, FormatConfig())
+
+    doc = Document(output)
+    assert doc.paragraphs[0].text.startswith("☑")
+    assert doc.paragraphs[1].text.startswith("☐")
+
+
+def test_build_docx_renders_blockquotes(tmp_path):
+    ast = [
+        {
+            "type": "blockquote",
+            "children": [{"type": "paragraph", "text": "quoted", "runs": [{"text": "quoted"}]}],
+        }
+    ]
+    output = tmp_path / "out.docx"
+    build_docx(ast, output, FormatConfig())
+
+    doc = Document(output)
+    paragraph = doc.paragraphs[0]
+    assert paragraph.text == "quoted"
+    assert 'w:left="420"' in paragraph._p.xml
