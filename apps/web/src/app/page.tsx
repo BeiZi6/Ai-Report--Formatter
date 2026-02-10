@@ -1052,7 +1052,9 @@ export default function Home() {
 
           {error ? <p className="error-text">{error}</p> : null}
         </motion.section>
+	      </GradualBlur>
 
+	      <GradualBlur className="gradual-blur-wrap" maxBlur={5} maxOffset={8} minOpacity={0.88}>
         <motion.section className="panel preview-panel" variants={fadeUp} custom={0.3}>
           <div className="panel-header">
             <div>
@@ -1184,14 +1186,15 @@ export default function Home() {
               {logExportMessage ? <p className="hint">{logExportMessage}</p> : null}
             </div>
         </motion.section>
-        </motion.main>
       </GradualBlur>
+      </motion.main>
 
       <footer className="page-footer">
         <p>
           说明：如系统未安装中文黑体字体（如 SimHei/黑体），标题字体可能被自动替换。
         </p>
       </footer>
+    </div>
     </div>
   );
 }
