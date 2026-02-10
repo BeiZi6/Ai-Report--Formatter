@@ -2,9 +2,16 @@
 "use client";
 
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { DecryptedText, ShinyText } from "@/components/reactbits";
 import { fetchExportStats, fetchPreview, generateDocx } from "../lib/api";
+
+const GlitchText = dynamic(() => import("@/components/reactbits/GlitchText"), {
+  ssr: false,
+  loading: () => <span className="hero-badge-glitch">FastAPI · Next.js · Word</span>,
+});
 
 type PreviewPayload = {
   summary?: {
@@ -84,7 +91,16 @@ function StatusPill({ label }: { label: string }) {
   return (
     <div className="status-pill" aria-live="polite">
       <span className="dot-pulse" aria-hidden="true" />
-      <span>{label}</span>
+      <DecryptedText
+        text={label}
+        animateOn="hover"
+        speed={40}
+        maxIterations={8}
+        className="rb-status-text"
+        encryptedClassName="rb-status-encrypted"
+        parentClassName="rb-status-wrap"
+        dataTestId="rb-status-decrypt"
+      />
     </div>
   );
 }
@@ -384,10 +400,21 @@ export default function Home() {
         animate="visible"
         custom={0}
       >
-        <div className="hero-badge">FastAPI · Next.js · Word</div>
+        <div className="hero-badge">
+          <GlitchText className="hero-badge-glitch" enableOnHover={false} speed={0.9}>
+            FastAPI · Next.js · Word
+          </GlitchText>
+        </div>
         <h1 className="hero-title">AI 报告排版助手</h1>
         <p className="hero-subtitle">
-          把 Markdown 变成干净、专业、可交付的 Word 文档。左侧编辑，右侧即时预览摘要。
+          把 Markdown 变成干净、专业、可交付的 Word 文档。
+          <ShinyText
+            text="左侧编辑，右侧即时预览摘要。"
+            className="hero-shiny"
+            speed={2.6}
+            pauseOnHover
+            dataTestId="rb-hero-shiny"
+          />
         </p>
         <div className="hero-meta">
           <span>两栏工作台</span>

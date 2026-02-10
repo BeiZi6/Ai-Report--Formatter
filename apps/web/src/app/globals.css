@@ -284,6 +284,11 @@ textarea {
   width: fit-content;
   }
 
+.hero-badge-glitch {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .hero-title {
   font-family: var(--font-display), "Press Start 2P", cursive;
   font-size: clamp(1.4rem, 1.1rem + 1vw, 2.1rem);
@@ -297,6 +302,11 @@ textarea {
   color: var(--text-secondary);
   max-width: 760px;
   line-height: 1.5;
+}
+
+.hero-shiny {
+  margin-left: 0.3rem;
+  font-weight: 700;
 }
 
 .hero-meta {
@@ -364,6 +374,19 @@ textarea {
   box-shadow: var(--pixel-shadow-sm);
 }
 
+.rb-status-wrap {
+  line-height: 1;
+}
+
+.rb-status-text {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.rb-status-encrypted {
+  opacity: 0.55;
+}
+
 .dot-pulse {
   width: 8px;
   height: 8px;
@@ -405,7 +428,6 @@ textarea {
 .field textarea:focus,
 .field select:focus,
 .field input:focus {
-  outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-wash), inset 2px 2px 0 #d1d1d1;
   outline: 2px dashed var(--accent);
@@ -501,12 +523,7 @@ textarea {
   color: var(--text-primary);
 }
 
-.primary-btn:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: var(--pixel-shadow-lg);
-}
-
-.primary-btn:disabled {
+.primary-btn:where(:disabled) {
   cursor: not-allowed;
   background: #e1e1e1;
   color: var(--text-secondary);
@@ -519,7 +536,20 @@ textarea {
   box-shadow: var(--pixel-shadow-lg);
 }
 
-.primary-btn.strong:hover {
+.primary-btn.strong:where(:disabled) {
+  cursor: not-allowed;
+  background: #e1e1e1;
+  color: var(--text-secondary);
+  box-shadow: var(--pixel-shadow);
+  transform: none;
+}
+
+.primary-btn:not(:disabled):hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--pixel-shadow-lg);
+}
+
+.primary-btn.strong:not(:disabled):hover {
   box-shadow: 8px 8px 0 #0f0f0f;
 }
 
@@ -831,12 +861,18 @@ textarea {
   .ghost-btn {
     width: 100%;
   }
+
+  .hero-shiny {
+    display: block;
+    margin-left: 0;
+    margin-top: 0.2rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
+    animation: none;
+    transition: none;
+    scroll-behavior: auto;
   }
 }

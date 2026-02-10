@@ -25,7 +25,10 @@
     "release:desktop": "npm run build:backend && npm run build && electron-builder --publish always"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "framer-motion": "^12.30.0",
+    "gsap": "^3.14.2",
+    "motion": "^12.34.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -41,6 +44,7 @@
     "electron-builder": "^25.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "playwright": "^1.58.1",
     "typescript": "^5",
     "wait-on": "^9.0.3"
   },

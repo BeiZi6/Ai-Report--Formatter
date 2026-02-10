@@ -1,0 +1,62 @@
+.glitch {
+  position: relative;
+  display: inline-block;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.enableOnHover:hover::before,
+.enableOnHover:hover::after {
+  opacity: 1;
+}
+
+.alwaysOn::before,
+.alwaysOn::after {
+  opacity: 1;
+}
+
+.glitch::before {
+  text-shadow: var(--before-shadow, none);
+  animation: glitchShift var(--before-duration, 2s) infinite steps(1, end);
+}
+
+.glitch::after {
+  text-shadow: var(--after-shadow, none);
+  animation: glitchShift var(--after-duration, 3s) infinite steps(1, end) reverse;
+}
+
+@keyframes glitchShift {
+  0% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-1px, 1px);
+  }
+  40% {
+    transform: translate(1px, -1px);
+  }
+  60% {
+    transform: translate(-1px, -1px);
+  }
+  80% {
+    transform: translate(1px, 1px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch::before,
+  .glitch::after {
+    animation: none;
+    opacity: 0;
+  }
+}

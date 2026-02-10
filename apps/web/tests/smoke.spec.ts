@@ -25,3 +25,10 @@ test("shows runtime log export action in web mode", async ({ page }) => {
 	await expect(page.getByTestId("btn-export-logs")).toBeVisible();
 	await expect(page.getByTestId("btn-export-logs")).toBeDisabled();
 });
+
+test("renders react-bits enhanced text accents", async ({ page }) => {
+	await page.goto("/");
+
+	await expect(page.getByTestId("rb-hero-shiny")).toBeVisible();
+	await expect(page.getByTestId("rb-status-decrypt")).toBeVisible();
+});
