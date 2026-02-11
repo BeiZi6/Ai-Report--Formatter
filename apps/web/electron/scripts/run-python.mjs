@@ -16,19 +16,19 @@ const configuredPython = (() => {
   return process.platform === 'win32' ? `${root}\\python.exe` : `${root}/python`;
 })();
 
-const candidates = process.platform === 'win32'
+const fallbackCandidates = process.platform === 'win32'
   ? [
-      ...(configuredPython ? [[configuredPython, []]] : []),
       ['python', []],
       ['python3', []],
       ['py', ['-3.11']],
       ['py', ['-3']],
     ]
   : [
-      ...(configuredPython ? [[configuredPython, []]] : []),
       ['python3', []],
       ['python', []],
     ];
+
+const candidates = configuredPython ? [[configuredPython, []]] : fallbackCandidates;
 
 for (const [binary, prefixArgs] of candidates) {
   const result = spawnSync(binary, [...prefixArgs, scriptPath, ...scriptArgs], {
