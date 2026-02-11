@@ -2,7 +2,6 @@ import path from 'node:path';
 
 export const DESKTOP_API_HOST = '127.0.0.1';
 export const DESKTOP_API_PORT = '8000';
-export const DESKTOP_API_BASE_URL = `http://${DESKTOP_API_HOST}:${DESKTOP_API_PORT}`;
 const BACKEND_READY_PATH = '/healthz';
 const BACKEND_READY_ATTEMPTS = 120;
 const BACKEND_READY_INTERVAL_MS = 500;
@@ -21,11 +20,21 @@ export function getBackendExecutablePath({ isPackaged, platform, resourcesPath, 
   return path.join(electronDir, 'backend', binaryName);
 }
 
-export function buildBackendEnv(baseEnv) {
+export function buildBackendBaseUrl({
+  host = DESKTOP_API_HOST,
+  port = DESKTOP_API_PORT,
+} = {}) {
+  return `http://${host}:${port}`;
+}
+
+export function buildBackendEnv(baseEnv, {
+  host = DESKTOP_API_HOST,
+  port = DESKTOP_API_PORT,
+} = {}) {
   return {
     ...baseEnv,
-    DESKTOP_API_HOST,
-    DESKTOP_API_PORT,
+    DESKTOP_API_HOST: host,
+    DESKTOP_API_PORT: port,
     API_CORS_EXTRA_ORIGINS: 'null',
   };
 }
@@ -34,8 +43,11 @@ export function shouldLaunchBundledBackend({ isPackaged }) {
   return isPackaged;
 }
 
-export function getBackendReadyEndpoint() {
-  return `${DESKTOP_API_BASE_URL}${BACKEND_READY_PATH}`;
+export function getBackendReadyEndpoint({
+  host = DESKTOP_API_HOST,
+  port = DESKTOP_API_PORT,
+} = {}) {
+  return `${buildBackendBaseUrl({ host, port })}${BACKEND_READY_PATH}`;
 }
 
 export function getBackendReadinessConfig() {

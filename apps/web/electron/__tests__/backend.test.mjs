@@ -3,6 +3,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+	buildBackendBaseUrl,
 	buildBackendEnv,
 	getBackendExecutablePath,
 	getBackendReadinessConfig,
@@ -45,6 +46,21 @@ test("builds backend environment with desktop defaults", () => {
 	assert.equal(env.DESKTOP_API_HOST, "127.0.0.1");
 	assert.equal(env.DESKTOP_API_PORT, "8000");
 	assert.equal(env.API_CORS_EXTRA_ORIGINS, "null");
+});
+
+test("supports overriding backend host and port", () => {
+	assert.equal(
+		buildBackendBaseUrl({ host: "127.0.0.1", port: "8012" }),
+		"http://127.0.0.1:8012",
+	);
+
+	const env = buildBackendEnv({}, { host: "127.0.0.1", port: "8012" });
+	assert.equal(env.DESKTOP_API_HOST, "127.0.0.1");
+	assert.equal(env.DESKTOP_API_PORT, "8012");
+	assert.equal(
+		getBackendReadyEndpoint({ host: "127.0.0.1", port: "8012" }),
+		"http://127.0.0.1:8012/healthz",
+	);
 });
 
 test("only auto-launches bundled backend in packaged mode", () => {

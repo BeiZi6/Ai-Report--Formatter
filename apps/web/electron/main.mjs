@@ -1,11 +1,15 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 
 import {
+	buildBackendBaseUrl,
 	buildBackendEnv,
+	DESKTOP_API_HOST,
+	DESKTOP_API_PORT,
 	getBackendExecutablePath,
 	getBackendReadinessConfig,
 	getBackendReadyEndpoint,
@@ -23,17 +27,81 @@ import {
 
 const DEV_SERVER_URL =
 	process.env.ELECTRON_RENDERER_URL ?? "http://localhost:3000";
-const BACKEND_READY_ENDPOINT = getBackendReadyEndpoint();
 const BACKEND_READINESS = getBackendReadinessConfig();
+const BACKEND_PORT_SCAN_ATTEMPTS = 20;
+const BACKEND_STATUS_CHANNEL = "desktop:backend-startup-status";
 
 let backendProcess = null;
 let isQuitting = false;
 let runtimeLogFilePath = null;
+let desktopApiBaseUrl = buildBackendBaseUrl();
+let backendReadyEndpoint = getBackendReadyEndpoint();
+let backendStartupStatus = {
+	phase: "idle",
+	progress: 100,
+	message: "本地服务待命",
+	updatedAt: new Date().toISOString(),
+};
 
 function wait(ms) {
 	return new Promise((resolve) => {
 		setTimeout(resolve, ms);
 	});
+}
+
+function pushBackendStartupStatus() {
+	for (const windowInstance of BrowserWindow.getAllWindows()) {
+		if (windowInstance.isDestroyed()) {
+			continue;
+		}
+
+		windowInstance.webContents.send(BACKEND_STATUS_CHANNEL, backendStartupStatus);
+	}
+}
+
+function updateBackendStartupStatus({ phase, progress, message }) {
+	backendStartupStatus = {
+		phase,
+		progress: Math.max(0, Math.min(100, Math.round(progress))),
+		message,
+		updatedAt: new Date().toISOString(),
+	};
+	pushBackendStartupStatus();
+}
+
+function setDesktopApiBaseUrl({ host, port }) {
+	desktopApiBaseUrl = buildBackendBaseUrl({ host, port });
+	backendReadyEndpoint = getBackendReadyEndpoint({ host, port });
+	process.env.DESKTOP_API_BASE_URL = desktopApiBaseUrl;
+}
+
+function canListenOnPort({ host, port }) {
+	return new Promise((resolve) => {
+		const probe = net.createServer();
+
+		probe.once("error", () => {
+			resolve(false);
+		});
+
+		probe.once("listening", () => {
+			probe.close(() => resolve(true));
+		});
+
+		probe.listen({ host, port, exclusive: true });
+	});
+}
+
+async function resolveBackendPort({ host, preferredPort }) {
+	for (let offset = 0; offset < BACKEND_PORT_SCAN_ATTEMPTS; offset += 1) {
+		const candidate = preferredPort + offset;
+		if (await canListenOnPort({ host, port: candidate })) {
+			return candidate;
+		}
+	}
+
+	throw new Error(
+		`No available backend port found in range ${preferredPort}-${preferredPort + BACKEND_PORT_SCAN_ATTEMPTS - 1}`,
+	);
 }
 
 function buildErrorContext(error) {
@@ -152,16 +220,18 @@ function configurePermissionHandlers() {
 	}
 }
 
-async function waitForBundledBackendReady() {
+async function waitForBundledBackendReady({ endpoint, onProgress }) {
 	for (let attempt = 0; attempt < BACKEND_READINESS.attempts; attempt += 1) {
 		try {
-			const response = await fetch(BACKEND_READY_ENDPOINT);
+			const response = await fetch(endpoint);
 			if (response.ok) {
 				return true;
 			}
 		} catch {
 			// keep polling until timeout
 		}
+
+		onProgress?.(attempt + 1, BACKEND_READINESS.attempts);
 
 		await wait(BACKEND_READINESS.intervalMs);
 	}
@@ -177,7 +247,7 @@ function stopBundledBackend() {
 	backendProcess.kill();
 }
 
-function startBundledBackend() {
+function startBundledBackend({ host, port }) {
 	const backendExecutable = getBackendExecutablePath({
 		isPackaged: app.isPackaged,
 		platform: process.platform,
@@ -192,7 +262,7 @@ function startBundledBackend() {
 	}
 
 	backendProcess = spawn(backendExecutable, [], {
-		env: buildBackendEnv(process.env),
+		env: buildBackendEnv(process.env, { host, port }),
 		stdio: app.isPackaged ? "ignore" : "inherit",
 		windowsHide: true,
 	});
@@ -200,6 +270,11 @@ function startBundledBackend() {
 	backendProcess.on("exit", (code, signal) => {
 		if (!isQuitting && code !== 0) {
 			const message = `Bundled backend exited unexpectedly (code=${code}, signal=${signal ?? "none"})`;
+			updateBackendStartupStatus({
+				phase: "error",
+				progress: 100,
+				message: "本地服务已退出，请重启应用",
+			});
 			appendRuntimeLog({
 				level: "error",
 				message,
@@ -211,6 +286,11 @@ function startBundledBackend() {
 	});
 
 	backendProcess.on("error", (error) => {
+		updateBackendStartupStatus({
+			phase: "error",
+			progress: 100,
+			message: "本地服务启动失败",
+		});
 		reportRuntimeError("Failed to start bundled backend", error);
 	});
 }
@@ -292,6 +372,9 @@ function createWindow({ splashWindow } = {}) {
 	};
 
 	mainWindow.once("ready-to-show", revealMainWindow);
+	mainWindow.webContents.once("did-finish-load", () => {
+		mainWindow.webContents.send(BACKEND_STATUS_CHANNEL, backendStartupStatus);
+	});
 
 	void mainWindow.loadURL(rendererUrl).catch((error) => {
 		reportRuntimeError("Failed to load renderer URL", error);
@@ -324,10 +407,12 @@ function createWindow({ splashWindow } = {}) {
 ipcMain.handle("desktop:ping", () => "pong");
 ipcMain.handle("desktop:get-log-file-path", () => runtimeLogFilePath);
 ipcMain.handle("desktop:export-logs", async () => exportRuntimeLogs());
+ipcMain.handle("desktop:get-backend-startup-status", () => backendStartupStatus);
 
 app.whenReady().then(async () => {
 	initializeRuntimeLogging();
 	configurePermissionHandlers();
+	setDesktopApiBaseUrl({ host: DESKTOP_API_HOST, port: DESKTOP_API_PORT });
 
 	const launchBundledBackend = shouldLaunchBundledBackend({
 		isPackaged: app.isPackaged,
@@ -335,34 +420,117 @@ app.whenReady().then(async () => {
 	const splashWindow = launchBundledBackend ? createSplashWindow() : null;
 
 	if (launchBundledBackend) {
+		updateBackendStartupStatus({
+			phase: "starting",
+			progress: 5,
+			message: "正在准备本地服务...",
+		});
+
 		try {
-			startBundledBackend();
-			void waitForBundledBackendReady()
-				.then((isReady) => {
-					if (isReady) {
+			const backendPort = await resolveBackendPort({
+				host: DESKTOP_API_HOST,
+				preferredPort: Number(DESKTOP_API_PORT),
+			});
+			updateBackendStartupStatus({
+				phase: "starting",
+				progress: 18,
+				message: "正在分配服务端口...",
+			});
+
+			setDesktopApiBaseUrl({
+				host: DESKTOP_API_HOST,
+				port: String(backendPort),
+			});
+			appendRuntimeLog({
+				level: "info",
+				message: "Desktop backend endpoint configured",
+				context: {
+					baseUrl: desktopApiBaseUrl,
+					readyEndpoint: backendReadyEndpoint,
+				},
+			});
+
+			updateBackendStartupStatus({
+				phase: "starting",
+				progress: 30,
+				message: "正在启动本地服务进程...",
+			});
+
+			startBundledBackend({
+				host: DESKTOP_API_HOST,
+				port: String(backendPort),
+			});
+
+			let lastProgress = 30;
+			void waitForBundledBackendReady({
+				endpoint: backendReadyEndpoint,
+				onProgress: (attempt, total) => {
+					const ratio = total > 0 ? attempt / total : 0;
+					const nextProgress = Math.min(95, 30 + Math.round(ratio * 65));
+					if (nextProgress <= lastProgress) {
 						return;
 					}
+
+					lastProgress = nextProgress;
+					updateBackendStartupStatus({
+						phase: "starting",
+						progress: nextProgress,
+						message: "正在等待本地服务就绪...",
+					});
+				},
+			})
+				.then((isReady) => {
+					if (isReady) {
+						updateBackendStartupStatus({
+							phase: "ready",
+							progress: 100,
+							message: "本地服务已就绪",
+						});
+						return;
+					}
+
+					updateBackendStartupStatus({
+						phase: "error",
+						progress: 100,
+						message: "本地服务启动超时",
+					});
 
 					appendRuntimeLog({
 						level: "error",
 						message: "Bundled backend startup timeout",
-						context: { endpoint: BACKEND_READY_ENDPOINT },
+						context: { endpoint: backendReadyEndpoint },
 					});
 					dialog.showErrorBox(
 						"Backend Startup Timeout",
-						`The bundled API did not become ready at ${BACKEND_READY_ENDPOINT}`,
+						`The bundled API did not become ready at ${backendReadyEndpoint}`,
 					);
 				})
 				.catch((error) => {
+					updateBackendStartupStatus({
+						phase: "error",
+						progress: 100,
+						message: "本地服务启动失败",
+					});
 					reportRuntimeError("Bundled backend startup failed", error);
 					const message = error instanceof Error ? error.message : String(error);
 					dialog.showErrorBox("Bundled Backend Error", message);
 				});
 		} catch (error) {
+			updateBackendStartupStatus({
+				phase: "error",
+				progress: 100,
+				message: "本地服务启动失败",
+			});
 			reportRuntimeError("Bundled backend startup failed", error);
 			const message = error instanceof Error ? error.message : String(error);
 			dialog.showErrorBox("Bundled Backend Error", message);
 		}
+	} else {
+		updateBackendStartupStatus({
+			phase: "ready",
+			progress: 100,
+			message: "本地服务已就绪",
+		});
 	}
 
 	createWindow({ splashWindow });

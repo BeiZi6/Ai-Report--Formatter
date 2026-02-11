@@ -3,7 +3,8 @@
 
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
-import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 import RegistryGradualBlur from "@/components/GradualBlur";
 import { AnimatedContent, BlurText, DecryptedText, Folder, ShinyText, Squares } from "@/components/reactbits";
@@ -46,6 +47,13 @@ type PreviewPayload = {
 type ExportStats = {
   today: number;
   total: number;
+};
+
+type BackendStartupStatus = {
+  phase: "idle" | "starting" | "ready" | "error";
+  progress: number;
+  message: string;
+  updatedAt: string;
 };
 
 type FormatConfig = {
@@ -298,6 +306,8 @@ export default function Home() {
   const [previewPages, setPreviewPages] = useState<string[]>([]);
   const [previewScale, setPreviewScale] = useState(1);
   const [hasDesktopLogExport, setHasDesktopLogExport] = useState(false);
+  const [backendStartup, setBackendStartup] = useState<BackendStartupStatus | null>(null);
+  const [isBackendReady, setIsBackendReady] = useState(true);
   const [logExportMessage, setLogExportMessage] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [isImportFolderOpen, setIsImportFolderOpen] = useState(false);
@@ -324,6 +334,9 @@ export default function Home() {
   );
 
   const isEmpty = markdown.trim().length === 0;
+  const isBackendStarting = backendStartup?.phase === "starting";
+  const isBackendError = backendStartup?.phase === "error";
+  const isBackendBlocked = isBackendStarting || isBackendError;
 
   const refreshExportStats = useCallback(async () => {
     try {
@@ -343,13 +356,60 @@ export default function Home() {
       return;
     }
 
-    setHasDesktopLogExport(typeof window.desktop?.exportLogs === "function");
+    const desktopBridge = window.desktop;
+    setHasDesktopLogExport(typeof desktopBridge?.exportLogs === "function");
+
+    if (
+      typeof desktopBridge?.getBackendStartupStatus !== "function" ||
+      typeof desktopBridge?.onBackendStartupStatus !== "function"
+    ) {
+      setIsBackendReady(true);
+      return;
+    }
+
+    let disposed = false;
+
+    const applyStatus = (status: BackendStartupStatus) => {
+      if (disposed) {
+        return;
+      }
+
+      setBackendStartup(status);
+      setIsBackendReady(status.phase === "ready" || status.phase === "idle");
+    };
+
+    void desktopBridge
+      .getBackendStartupStatus()
+      .then((status) => {
+        applyStatus(status);
+      })
+      .catch(() => {
+        if (!disposed) {
+          setIsBackendReady(true);
+        }
+      });
+
+    const unsubscribe = desktopBridge.onBackendStartupStatus((status) => {
+      applyStatus(status);
+    });
+
+    return () => {
+      disposed = true;
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
   }, []);
 
   useEffect(() => {
     if (isEmpty) {
       setPreview(null);
       setError(null);
+      return;
+    }
+
+    if (!isBackendReady) {
+      setIsLoading(false);
       return;
     }
 
@@ -374,7 +434,7 @@ export default function Home() {
       window.clearTimeout(handle);
       controller.abort();
     };
-  }, [bibliographyPayload, markdown, isEmpty]);
+  }, [bibliographyPayload, markdown, isBackendReady, isEmpty]);
 
   useEffect(() => {
     const viewport = previewViewportRef.current;
@@ -456,15 +516,20 @@ export default function Home() {
   }, [paragraphCount]);
 
   const statusLabel = useMemo(() => {
+    if (!isBackendReady) {
+      return backendStartup?.message ?? "本地服务启动中";
+    }
     if (isGenerating) return "正在导出";
     if (isLoading) return "分析中…";
     if (error) return "预览失败";
     if (isEmpty) return "等待输入";
     return "已更新";
-  }, [error, isEmpty, isGenerating, isLoading]);
+  }, [backendStartup?.message, error, isBackendReady, isEmpty, isGenerating, isLoading]);
 
   const ditherPrimaryColor = DITHER_PRIMARY_BY_THEME[theme];
   const ditherHoverColor = DITHER_HOVER_BY_THEME[theme];
+  const backendStartupProgress = Math.max(0, Math.min(100, backendStartup?.progress ?? 0));
+  const backendStartupMessage = backendStartup?.message ?? "正在启动本地服务...";
 
   const handleOpenImportPicker = useCallback(() => {
     setIsImportFolderOpen(true);
@@ -488,6 +553,11 @@ export default function Home() {
   }, []);
 
   const handleGenerate = async () => {
+    if (!isBackendReady) {
+      setError(backendStartupMessage);
+      return;
+    }
+
     if (isEmpty || isGenerating) return;
     setIsGenerating(true);
     setError(null);
@@ -594,6 +664,11 @@ export default function Home() {
   };
 
   const handleBatchExport = async () => {
+    if (!isBackendReady) {
+      setBatchMessage(backendStartupMessage);
+      return;
+    }
+
     const parts = markdown
       .split(/\n\s*---\s*\n/g)
       .map((part) => part.trim())
@@ -659,7 +734,7 @@ export default function Home() {
       </a>
       <div className="scanline-band" aria-hidden="true" />
 
-      <WaveRibbon status={statusLabel} onGenerate={handleGenerate} disabled={isEmpty || isGenerating} />
+      <WaveRibbon status={statusLabel} onGenerate={handleGenerate} disabled={isEmpty || isGenerating || isBackendBlocked} />
 
       <motion.header
         className="hero"
@@ -1259,8 +1334,8 @@ export default function Home() {
               className="ghost-btn"
               type="button"
               onClick={handleBatchExport}
-              disabled={isEmpty || isGenerating}
-              aria-disabled={isEmpty || isGenerating}
+              disabled={isEmpty || isGenerating || isBackendBlocked}
+              aria-disabled={isEmpty || isGenerating || isBackendBlocked}
             >
               批量导出
             </button>
@@ -1268,13 +1343,25 @@ export default function Home() {
               className="primary-btn"
               type="button"
               onClick={handleGenerate}
-                disabled={isEmpty || isGenerating}
-                aria-disabled={isEmpty || isGenerating}
+                disabled={isEmpty || isGenerating || isBackendBlocked}
+                aria-disabled={isEmpty || isGenerating || isBackendBlocked}
                 data-testid="btn-generate"
               >
                 {isGenerating ? "生成中…" : "生成 Word"}
               </button>
             </div>
+
+          {isBackendBlocked ? (
+            <div className="backend-startup-progress" aria-live="polite" data-testid="backend-startup-progress">
+              <div className="backend-startup-header">
+                <span>{backendStartupMessage}</span>
+                <strong>{backendStartupProgress}%</strong>
+              </div>
+              <div className="backend-startup-track" aria-hidden="true">
+                <div className="backend-startup-fill" style={{ width: `${backendStartupProgress}%` }} />
+              </div>
+            </div>
+          ) : null}
 
           {batchMessage ? <p className="hint">{batchMessage}</p> : null}
 

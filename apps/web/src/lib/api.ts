@@ -1,3 +1,10 @@
+type BackendStartupStatus = {
+  phase: "idle" | "starting" | "ready" | "error";
+  progress: number;
+  message: string;
+  updatedAt: string;
+};
+
 type DesktopBridge = {
   apiBaseUrl?: string;
   getLogFilePath?: () => Promise<string | null>;
@@ -7,6 +14,10 @@ type DesktopBridge = {
     cancelled?: boolean;
     error?: string;
   }>;
+  getBackendStartupStatus?: () => Promise<BackendStartupStatus>;
+  onBackendStartupStatus?: (
+    listener: (status: BackendStartupStatus) => void,
+  ) => (() => void) | undefined;
 };
 
 export type BibliographyPayload = {
